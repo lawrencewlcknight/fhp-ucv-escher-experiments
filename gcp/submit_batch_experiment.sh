@@ -78,10 +78,13 @@ WORKDIR=/workspace
 REPO_DIR="$WORKDIR/fhp-poker-escher-architecture-experiments"
 JOB_OUTPUT_DIR="$REPO_DIR/outputs/cloud/{job_name}"
 RUN_LOG="$JOB_OUTPUT_DIR/batch_run.log"
-RESOURCE_LOG="$JOB_OUTPUT_DIR/resource_snapshots.log"
+RESOURCE_LOG="$JOB_OUTPUT_DIR/resource_snapshots.jsonl"
+BATCH_DIAGNOSTICS="$JOB_OUTPUT_DIR/batch_diagnostics.json"
 BOOT_LOG="/tmp/{job_name}_batch_boot.log"
 BUCKET_DEST="{bucket}/{job_name}/"
 RESOURCE_MONITOR_PID=""
+DIAGNOSTICS_PYTHON=""
+EXPERIMENT_EXIT_CODE=""
 
 exec > >(tee -a "$BOOT_LOG") 2>&1
 
@@ -113,16 +116,40 @@ cleanup() {{
       free -h || true
       echo "Largest processes at cleanup:"
       ps -eo pid,ppid,pcpu,pmem,rss,vsz,comm --sort=-rss | head -25 || true
+      echo "Kernel OOM messages (if access is permitted):"
+      dmesg 2>&1 | grep -E -i 'out of memory|oom-kill|killed process' | tail -100 || true
     }} | tee -a "$RUN_LOG"
 
-    cat > "$JOB_OUTPUT_DIR/batch_status.json" <<STATUS_JSON
+    diagnostics_python="$DIAGNOSTICS_PYTHON"
+    if [[ -z "$diagnostics_python" ]]; then
+      diagnostics_python="$(command -v python3 || true)"
+    fi
+    if [[ -n "$diagnostics_python" ]]; then
+      "$diagnostics_python" -m fhp_escher.batch_diagnostics finalize \
+        --snapshots "$RESOURCE_LOG" \
+        --output "$BATCH_DIAGNOSTICS" \
+        --status-output "$JOB_OUTPUT_DIR/batch_status.json" \
+        --failure-root "$JOB_OUTPUT_DIR" \
+        --exit-code "$exit_code" \
+        --experiment-exit-code "$EXPERIMENT_EXIT_CODE" \
+        --requested-memory-mib "{memory_mib}" \
+        --job-name "{job_name}" \
+        --bucket-destination "$BUCKET_DEST" \
+        | tee -a "$RUN_LOG" || true
+    fi
+
+    if [[ ! -f "$JOB_OUTPUT_DIR/batch_status.json" ]]; then
+      cat > "$JOB_OUTPUT_DIR/batch_status.json" <<STATUS_JSON
 {{
   "job_name": "{job_name}",
   "exit_code": $exit_code,
+  "experiment_exit_code": null,
+  "diagnosis": "diagnostics_collection_failed",
   "cleanup_timestamp_utc": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
   "bucket_destination": "$BUCKET_DEST"
 }}
 STATUS_JSON
+    fi
   fi
 
   local upload_code=0
@@ -152,23 +179,12 @@ trap 'echo "Received SIGTERM"; exit 143' TERM
 trap 'echo "Received SIGINT"; exit 130' INT
 
 start_resource_monitor() {{
-  (
-    while true; do
-      {{
-        echo "==== $(date -u '+%Y-%m-%dT%H:%M:%SZ') ===="
-        echo "Disk:"
-        df -h || true
-        echo "Memory:"
-        free -h || true
-        echo "Largest processes:"
-        ps -eo pid,ppid,pcpu,pmem,rss,vsz,comm --sort=-rss | head -25 || true
-        echo
-      }} >> "$RESOURCE_LOG" 2>&1
-      sleep 60
-    done
-  ) &
+  "$DIAGNOSTICS_PYTHON" -m fhp_escher.batch_diagnostics monitor \
+    --output "$RESOURCE_LOG" \
+    --interval-seconds 15 \
+    --cloud-log-every 4 &
   RESOURCE_MONITOR_PID="$!"
-  echo "Started resource monitor with PID $RESOURCE_MONITOR_PID"
+  echo "Started 15-second resource monitor with PID $RESOURCE_MONITOR_PID"
 }}
 
 run_experiment() {{
@@ -234,6 +250,7 @@ echo "Configured Cloud SDK Python:"
 uv python install 3.11
 uv venv --python 3.11 --seed /tmp/fhp-escher-venv
 source /tmp/fhp-escher-venv/bin/activate
+DIAGNOSTICS_PYTHON="$(command -v python)"
 python --version
 
 python -m pip install --upgrade pip setuptools wheel
@@ -249,6 +266,7 @@ if run_experiment; then
 else
   experiment_exit="$?"
 fi
+EXPERIMENT_EXIT_CODE="$experiment_exit"
 
 deactivate || true
 

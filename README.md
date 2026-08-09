@@ -87,9 +87,15 @@ JOB_NAME="fhp-escher-exp1-$(date -u +%Y%m%d-%H%M%S)"
 
 The 14-hour Batch allowance leaves time around the 12 hours of model training
 for VM setup, both policy fits, checkpoint verification, teardown, and upload.
-The cleanup trap uploads outputs even after a failed run. Resource snapshots are
-written every minute so the result can distinguish memory limits from
-insufficient training throughput.
+The cleanup trap uploads outputs even after a failed run. An independent monitor
+writes `resource_snapshots.jsonl` every 15 seconds, including cgroup memory
+current/peak/limit values, OOM counters, system memory, disk use, load, and the
+largest processes. Compact resource heartbeats also reach Cloud Logging every
+minute. On cleanup, `batch_diagnostics.json` preserves the detailed evidence and
+`batch_status.json` classifies confirmed cgroup OOM, reported allocator errors,
+probable OOM/SIGKILL, timeout/termination, Python exceptions, and other nonzero
+exits. The run log also attempts to capture kernel OOM messages when the VM
+permits it.
 
 ## Verification
 
