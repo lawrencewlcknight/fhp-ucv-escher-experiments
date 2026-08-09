@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,13 @@ def test_smoke_run_saves_reloadable_final_policy(tmp_path: Path):
     assert payload["algorithm"] == "UCV-ESCHER"
     assert payload["seed"] == 7
     assert payload["nodes_touched"] > 0
+    assert payload["checkpoint_kind"] == "outer_iteration"
+    checkpoint_manifest = json.loads(
+        (run_dir / "checkpoint_manifest.json").read_text(encoding="utf-8")
+    )
+    assert [row["checkpoint_kind"] for row in checkpoint_manifest] == [
+        "outer_iteration"
+    ]
 
     game = load_fhp_game()
     restored = LoadedFHPPolicy(game, final_checkpoint)

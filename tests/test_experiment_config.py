@@ -33,6 +33,8 @@ def test_selected_ucv_configuration_is_pinned():
     assert BEST_UCV_CONFIG["calibration_train_steps"] == 2_000
     assert BEST_UCV_CONFIG["prediction_gate_ema_decay"] == 0.9
     assert BEST_UCV_CONFIG["evaluation_frequency"] == 1
+    assert BEST_UCV_CONFIG["evaluate_initial_policy"] is False
+    assert BEST_UCV_CONFIG["early_evaluation_node_thresholds"] == ()
     payload = {
         key: value for key, value in BEST_UCV_CONFIG.items() if key != "game_name"
     }

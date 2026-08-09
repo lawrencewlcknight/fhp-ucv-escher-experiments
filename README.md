@@ -32,10 +32,11 @@ settings unchanged to FHP. It targets 15 million training nodes but uses an
 internal 11-hour training budget, leaving one hour inside the 12-hour Batch
 limit for final checkpoint verification and upload.
 
-The run saves a reloadable average-policy checkpoint after every fitted policy.
-Exact tabular exploitability is intentionally not attempted because enumerating
-the FHP tree is impractical. The saved policies are designed for sampled
-head-to-head evaluation.
+The run saves a reloadable average-policy checkpoint after every completed
+outer-iteration policy fit. Initial-policy and early node-threshold evaluations
+are disabled. Exact tabular exploitability is intentionally not attempted
+because enumerating the FHP tree is impractical. The saved policies are designed
+for sampled head-to-head evaluation.
 
 Local orchestration smoke test:
 

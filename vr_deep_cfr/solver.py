@@ -172,7 +172,7 @@ class DeepCumuAdv:
         Optional initial and node-threshold checkpoints are evaluation-only:
         they do not add training nodes and their RNG use is isolated from the
         subsequent traversal stream. The optional callback is called after an
-        already scheduled policy fit and exact evaluation. It receives the
+        already scheduled policy fit and diagnostic checkpoint. It receives the
         solver and checkpoint row and does not require another fit or
         evaluation.
         """

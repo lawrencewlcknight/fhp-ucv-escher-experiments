@@ -13,9 +13,9 @@ ALGORITHM_LABEL = "UCV-ESCHER"
 DEFAULT_SEED = 0
 
 # Experiment 1 preserves every algorithm and optimiser setting from the final
-# predecessor UCV-ESCHER configuration. Only the required game identifier is
-# FHP. Runtime and node limits below are orchestration safeguards, not solver
-# update-rule changes.
+# predecessor UCV-ESCHER configuration. The required game identifier is FHP,
+# and the two whole-game-era evaluation triggers are disabled. Runtime, node,
+# and checkpoint controls are orchestration safeguards, not update-rule changes.
 BEST_UCV_CONFIG = {
     "game_name": "FHP",
     "advantage_buffer_size": 1_000_000,
@@ -43,8 +43,8 @@ BEST_UCV_CONFIG = {
     "evaluation_frequency": 1,
     "max_num_iterations": 120,
     "preserve_evaluation_rng": True,
-    "evaluate_initial_policy": True,
-    "early_evaluation_node_thresholds": (10_000,),
+    "evaluate_initial_policy": False,
+    "early_evaluation_node_thresholds": (),
     "q_gradient_clip_norm": 10.0,
     "q_ensemble_size": 3,
     "beta_min": 0.0,
@@ -63,7 +63,7 @@ BEST_UCV_CONFIG = {
 # SHA-256 of the canonical JSON for every setting above except ``game_name``.
 # This makes an accidental optimisation or architecture change visible.
 BEST_UCV_TRAINING_CONFIG_SHA256 = (
-    "68e0483e732fb007b36a1a1539552c3171410981cade260355e954079d1bfdbd"
+    "36c580c0f44f9a324ad8a313a59de78c5f2ee00c0ff084d12c4f18eaac78f62b"
 )
 
 TARGET_NODES = 15_000_000
@@ -84,6 +84,10 @@ def validate_config(config: Mapping[str, object]) -> None:
         raise ValueError("The transferred UCV configuration uses three Q folds")
     if int(config["evaluation_frequency"]) != 1:
         raise ValueError("A reloadable policy checkpoint is required every iteration")
+    if bool(config["evaluate_initial_policy"]):
+        raise ValueError("Initial-policy evaluation is disabled for FHP")
+    if tuple(config["early_evaluation_node_thresholds"]):
+        raise ValueError("Early node-threshold evaluation is disabled for FHP")
     if not bool(config["preserve_evaluation_rng"]):
         raise ValueError("Checkpoint fitting must not perturb training RNG state")
 
@@ -104,7 +108,6 @@ def smoke_config() -> dict:
             "ave_policy_batch_size": 2,
             "baseline_batch_size": 2,
             "max_num_iterations": 1,
-            "early_evaluation_node_thresholds": (10,),
             "calibration_buffer_size": 128,
             "calibration_batch_size": 2,
             "calibration_train_steps": 1,
