@@ -28,12 +28,13 @@ CI. Provenance is recorded in [`fhp_escher/game.py`](fhp_escher/game.py).
 ## Experiment 1
 
 Experiment 1 transfers the selected UCV-ESCHER architecture and optimisation
-settings unchanged to FHP. It targets 15 million training nodes but uses an
-internal 11-hour training budget, leaving one hour inside the 12-hour Batch
-limit for final checkpoint verification and upload.
+settings to FHP and trains by elapsed training time rather than a node budget.
+It saves exactly two reloadable average-policy checkpoints: the first at the
+first safe trajectory boundary after 6 hours, and the final checkpoint after
+12 hours. Policy fitting and checkpoint-writing time is excluded from the
+training timer. Training stops immediately after the 12-hour checkpoint.
 
-The run saves a reloadable average-policy checkpoint after every completed
-outer-iteration policy fit. Initial-policy and early node-threshold evaluations
+Initial-policy, early node-threshold, and periodic outer-iteration evaluations
 are disabled. Exact tabular exploitability is intentionally not attempted
 because enumerating the FHP tree is impractical. The saved policies are designed
 for sampled head-to-head evaluation.
@@ -81,12 +82,14 @@ JOB_NAME="fhp-escher-exp1-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-8 43200 8000 32000 100
+  n2-standard-8 50400 8000 32000 100
 ```
 
-The Batch cleanup trap uploads outputs even after a failed run. Resource
-snapshots are written every minute so the result can distinguish memory limits
-from insufficient training throughput.
+The 14-hour Batch allowance leaves time around the 12 hours of model training
+for VM setup, both policy fits, checkpoint verification, teardown, and upload.
+The cleanup trap uploads outputs even after a failed run. Resource snapshots are
+written every minute so the result can distinguish memory limits from
+insufficient training throughput.
 
 ## Verification
 

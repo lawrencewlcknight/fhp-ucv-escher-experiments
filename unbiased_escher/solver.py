@@ -607,6 +607,9 @@ class UnbiasedControlVariateEscher(VRDeepPDCFRPlus):
             root_state = self.skip_chance_state(self.game.new_initial_state())
             self.dfs(root_state, player)
             self._maybe_run_early_node_checkpoint()
+            self._maybe_run_training_time_checkpoint()
+            if self._stop_requested:
+                break
 
     def iteration(self):
         self._reset_architecture_diagnostics()
@@ -622,6 +625,8 @@ class UnbiasedControlVariateEscher(VRDeepPDCFRPlus):
         holdout_errors = []
         for player in range(self.num_players):
             self.collect_training_data(player)
+            if self._stop_requested:
+                return
             holdout_errors.append(self._predictor_holdout_error(player))
             self.train_regret(player)
         for player, (prediction_mse, zero_mse) in enumerate(holdout_errors):
@@ -640,7 +645,10 @@ class UnbiasedControlVariateEscher(VRDeepPDCFRPlus):
         if q_loss is not None:
             self.logger.record("baseline_loss_0", q_loss)
             self.logger.record("baseline_loss_1", q_loss)
-        if self.num_iteration % self.evaluation_frequency == 0:
+        if (
+            self.evaluation_frequency > 0
+            and self.num_iteration % self.evaluation_frequency == 0
+        ):
             self._run_checkpoint(checkpoint_kind="outer_iteration")
 
     def _record_estimate_diagnostics(

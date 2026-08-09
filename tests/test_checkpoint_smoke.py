@@ -14,8 +14,7 @@ def test_smoke_run_saves_reloadable_final_policy(tmp_path: Path):
     run_dir = run_experiment(
         seed=7,
         config=smoke_config(),
-        target_nodes=500,
-        max_training_seconds=300,
+        checkpoint_training_seconds=(1e-6, 2e-6),
         output_root=tmp_path,
     )
     final_checkpoint = run_dir / "final_policy_checkpoint.pkl"
@@ -23,13 +22,19 @@ def test_smoke_run_saves_reloadable_final_policy(tmp_path: Path):
     assert payload["algorithm"] == "UCV-ESCHER"
     assert payload["seed"] == 7
     assert payload["nodes_touched"] > 0
-    assert payload["checkpoint_kind"] == "outer_iteration"
+    assert payload["checkpoint_kind"] == "training_time_checkpoint"
+    assert payload["checkpoint_target_seconds"] == 2e-6
     checkpoint_manifest = json.loads(
         (run_dir / "checkpoint_manifest.json").read_text(encoding="utf-8")
     )
-    assert [row["checkpoint_kind"] for row in checkpoint_manifest] == [
-        "outer_iteration"
+    assert [row["checkpoint_target_seconds"] for row in checkpoint_manifest] == [
+        1e-6,
+        2e-6,
     ]
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["stop_reason"] == "training_time_budget"
+    assert summary["checkpoint_count"] == 2
+    assert summary["capacity_assessment"] == "checkpoint_schedule_completed"
 
     game = load_fhp_game()
     restored = LoadedFHPPolicy(game, final_checkpoint)

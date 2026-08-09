@@ -51,6 +51,10 @@ def save_policy_checkpoint(
         "nodes_touched": int(solver.nodes_touched),
         "checkpoint_kind": str(checkpoint_row.get("checkpoint_kind", "")),
         "checkpoint_target_nodes": checkpoint_row.get("checkpoint_target_nodes"),
+        "checkpoint_target_seconds": checkpoint_row.get("checkpoint_target_seconds"),
+        "training_elapsed_seconds": float(
+            checkpoint_row.get("training_elapsed_seconds", 0.0)
+        ),
         "wall_clock_seconds": float(checkpoint_row.get("wall_clock_seconds", 0.0)),
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "training_config": dict(config),

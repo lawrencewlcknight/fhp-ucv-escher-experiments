@@ -9,7 +9,7 @@ copy is retained for research reproducibility and attribution; redistribution
 rights should be confirmed with the authors before publishing this repository.
 
 Integration changes include direct OpenSpiel FHP loading, structured metrics,
-matched-node and wall-clock stopping, deterministic checkpoint isolation,
+training-time stopping, deterministic checkpoint isolation,
 and an obvious optimiser reset correction in `VRPDCFRPlusRegretTrainer.reset`
 (the upstream reset incorrectly attached the immediate-regret optimiser to the
 cumulative-regret model parameters). The integration also corrects the swapped

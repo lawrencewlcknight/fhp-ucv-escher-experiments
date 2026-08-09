@@ -106,6 +106,12 @@ class DeepCumuAdv:
         self.max_wall_clock_seconds = None
         self.stop_reason = "iteration_cap"
         self._last_iteration_seconds = None
+        self.training_time_checkpoint_seconds = ()
+        self.stop_after_final_training_time_checkpoint = False
+        self._next_training_time_checkpoint_index = 0
+        self._checkpoint_overhead_seconds = 0.0
+        self._active_checkpoint_started_at = None
+        self._stop_requested = False
         set_seed(seed)
         self.init_ave_policy_trainer()
         self.init_regret_trainers()
@@ -167,18 +173,18 @@ class DeepCumuAdv:
         )
 
     def solve(self, post_checkpoint_callback=None):
-        """Train until the configured iteration cap or matched node budget.
+        """Train until the configured time schedule, iteration cap, or node budget.
 
-        Optional initial and node-threshold checkpoints are evaluation-only:
-        they do not add training nodes and their RNG use is isolated from the
-        subsequent traversal stream. The optional callback is called after an
-        already scheduled policy fit and diagnostic checkpoint. It receives the
-        solver and checkpoint row and does not require another fit or
-        evaluation.
+        Checkpoint fitting and persistence are excluded from the training-time
+        clock, and checkpoint RNG use is isolated from the subsequent traversal
+        stream. The optional callback is called after an already scheduled
+        policy fit and diagnostic checkpoint. It receives the solver and
+        checkpoint row and does not require another fit or evaluation.
         """
         self._post_checkpoint_callback = post_checkpoint_callback
         self._solve_start_time = time.perf_counter()
         self._prepare_early_evaluation_schedule()
+        self._prepare_training_time_checkpoint_schedule()
         if self.evaluate_initial_policy:
             # The untrained average-policy head is zero-initialised, so this is
             # the exact uniform-over-legal-actions policy. No replay fit is
@@ -194,6 +200,9 @@ class DeepCumuAdv:
             iteration_start = time.perf_counter()
             self.iteration()
             self._last_iteration_seconds = time.perf_counter() - iteration_start
+            if self._stop_requested:
+                self.stop_reason = "training_time_budget"
+                break
             if (
                 self.target_nodes_touched is not None
                 and self.nodes_touched >= int(self.target_nodes_touched)
@@ -203,8 +212,9 @@ class DeepCumuAdv:
             if self._wall_clock_seconds() >= self._wall_clock_limit():
                 self.stop_reason = "wall_clock_budget"
                 break
-        if not self.checkpoint_rows or (
-            self.checkpoint_rows[-1]["nodes_touched"] != self.nodes_touched
+        if not self.training_time_checkpoint_seconds and (
+            not self.checkpoint_rows
+            or self.checkpoint_rows[-1]["nodes_touched"] != self.nodes_touched
         ):
             self._run_checkpoint(checkpoint_kind="final_node_budget")
         return list(self.checkpoint_rows)
@@ -213,6 +223,13 @@ class DeepCumuAdv:
         if self._solve_start_time is None:
             return 0.0
         return time.perf_counter() - self._solve_start_time
+
+    def _training_elapsed_seconds(self):
+        """Elapsed solver time excluding policy-checkpoint fitting and writes."""
+        elapsed = self._wall_clock_seconds() - self._checkpoint_overhead_seconds
+        if self._active_checkpoint_started_at is not None:
+            elapsed -= time.perf_counter() - self._active_checkpoint_started_at
+        return max(0.0, elapsed)
 
     def _wall_clock_limit(self):
         if self.max_wall_clock_seconds is None:
@@ -233,11 +250,61 @@ class DeepCumuAdv:
         self.num_iteration += 1
         for player in range(self.num_players):
             self.collect_training_data(player)
+            if self._stop_requested:
+                return
             self.train_regret(player)
             if self.use_baseline:
                 self.train_baseline(player)
-        if self.num_iteration % self.evaluation_frequency == 0:
+        if (
+            self.evaluation_frequency > 0
+            and self.num_iteration % self.evaluation_frequency == 0
+        ):
             self._run_checkpoint(checkpoint_kind="outer_iteration")
+
+    def _prepare_training_time_checkpoint_schedule(self):
+        schedule = tuple(float(value) for value in self.training_time_checkpoint_seconds)
+        if any(value <= 0.0 for value in schedule):
+            raise ValueError("Training-time checkpoint thresholds must be positive")
+        if any(left >= right for left, right in zip(schedule, schedule[1:])):
+            raise ValueError(
+                "Training-time checkpoint thresholds must be strictly increasing"
+            )
+        self.training_time_checkpoint_seconds = schedule
+        self._next_training_time_checkpoint_index = 0
+        self._checkpoint_overhead_seconds = 0.0
+        self._active_checkpoint_started_at = None
+        self._stop_requested = False
+
+    @staticmethod
+    def _training_time_checkpoint_kind(target_seconds):
+        hours = float(target_seconds) / 3600.0
+        if hours.is_integer():
+            return f"training_time_{int(hours)}h"
+        return "training_time_checkpoint"
+
+    def _maybe_run_training_time_checkpoint(self):
+        while self._next_training_time_checkpoint_index < len(
+            self.training_time_checkpoint_seconds
+        ):
+            target_seconds = self.training_time_checkpoint_seconds[
+                self._next_training_time_checkpoint_index
+            ]
+            if self._training_elapsed_seconds() < target_seconds:
+                return
+            if len(self.ave_policy_trainer.buffer) == 0:
+                return
+            self._next_training_time_checkpoint_index += 1
+            self._run_checkpoint(
+                checkpoint_kind=self._training_time_checkpoint_kind(target_seconds),
+                checkpoint_target_seconds=target_seconds,
+            )
+            if (
+                self.stop_after_final_training_time_checkpoint
+                and self._next_training_time_checkpoint_index
+                == len(self.training_time_checkpoint_seconds)
+            ):
+                self._stop_requested = True
+                return
 
     def _prepare_early_evaluation_schedule(self):
         thresholds = tuple(
@@ -291,19 +358,27 @@ class DeepCumuAdv:
         *,
         checkpoint_kind="outer_iteration",
         checkpoint_target_nodes=None,
+        checkpoint_target_seconds=None,
     ):
         """Fit/evaluate the average policy without perturbing training RNG."""
         rng_state = self._capture_rng_state() if self.preserve_evaluation_rng else None
+        checkpoint_started_at = time.perf_counter()
+        self._active_checkpoint_started_at = checkpoint_started_at
         try:
             self.train_average_policy()
             self.evaluate(
                 checkpoint_kind=checkpoint_kind,
                 checkpoint_target_nodes=checkpoint_target_nodes,
+                checkpoint_target_seconds=checkpoint_target_seconds,
             )
             callback = getattr(self, "_post_checkpoint_callback", None)
             if callback is not None:
                 callback(self, dict(self.checkpoint_rows[-1]))
         finally:
+            self._checkpoint_overhead_seconds += (
+                time.perf_counter() - checkpoint_started_at
+            )
+            self._active_checkpoint_started_at = None
             if rng_state is not None:
                 self._restore_rng_state(rng_state)
 
@@ -314,6 +389,9 @@ class DeepCumuAdv:
             root_state = self.skip_chance_state(self.game.new_initial_state())
             self.dfs(root_state, player)
             self._maybe_run_early_node_checkpoint()
+            self._maybe_run_training_time_checkpoint()
+            if self._stop_requested:
+                break
 
     def train_regret(self, player):
         if self.reinitialize_advantage_networks:
@@ -343,12 +421,14 @@ class DeepCumuAdv:
         *,
         checkpoint_kind="outer_iteration",
         checkpoint_target_nodes=None,
+        checkpoint_target_seconds=None,
     ):
         self.logger.record("nodes_touched", self.nodes_touched)
         self.logger.record("iteration", self.num_iteration)
         self.logger.record("episode", self.episode)
         self.logger.record("checkpoint_kind", checkpoint_kind)
         self.logger.record("checkpoint_target_nodes", checkpoint_target_nodes)
+        self.logger.record("checkpoint_target_seconds", checkpoint_target_seconds)
         # Exact tabular exploitability requires enumerating FHP's enormous game
         # tree. Checkpoints therefore report training diagnostics and are kept
         # reloadable for sampled head-to-head evaluation instead.
@@ -357,6 +437,7 @@ class DeepCumuAdv:
         self.logger.record("evaluation_status", "deferred_to_head_to_head")
         wall_clock = self._wall_clock_seconds()
         self.logger.record("wall_clock_seconds", wall_clock)
+        self.logger.record("training_elapsed_seconds", self._training_elapsed_seconds())
         row = self.logger.dump(step=self.episode)
         self.checkpoint_rows.append(dict(row))
 

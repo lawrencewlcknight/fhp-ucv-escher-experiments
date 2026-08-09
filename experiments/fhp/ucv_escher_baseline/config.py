@@ -11,6 +11,10 @@ EXPERIMENT_NAME = "fhp_ucv_escher_baseline"
 ALGORITHM_ID = "ucv_escher"
 ALGORITHM_LABEL = "UCV-ESCHER"
 DEFAULT_SEED = 0
+CHECKPOINT_TRAINING_SECONDS = (6 * 60 * 60, 12 * 60 * 60)
+TRAINING_DURATION_SECONDS = CHECKPOINT_TRAINING_SECONDS[-1]
+ITERATION_SAFETY_CAP = 1_000_000
+BATCH_TIMEOUT_SECONDS = 14 * 60 * 60
 
 # Experiment 1 preserves every algorithm and optimiser setting from the final
 # predecessor UCV-ESCHER configuration. The required game identifier is FHP,
@@ -40,8 +44,8 @@ BEST_UCV_CONFIG = {
     "alpha": 2.3,
     "gamma": 2.0,
     "device": "cpu",
-    "evaluation_frequency": 1,
-    "max_num_iterations": 120,
+    "evaluation_frequency": 0,
+    "max_num_iterations": ITERATION_SAFETY_CAP,
     "preserve_evaluation_rng": True,
     "evaluate_initial_policy": False,
     "early_evaluation_node_thresholds": (),
@@ -63,12 +67,9 @@ BEST_UCV_CONFIG = {
 # SHA-256 of the canonical JSON for every setting above except ``game_name``.
 # This makes an accidental optimisation or architecture change visible.
 BEST_UCV_TRAINING_CONFIG_SHA256 = (
-    "36c580c0f44f9a324ad8a313a59de78c5f2ee00c0ff084d12c4f18eaac78f62b"
+    "42a1c60051502d7cf44d6a368d144588b7b470910d4a20c602b2667118431846"
 )
 
-TARGET_NODES = 15_000_000
-MAX_TRAINING_SECONDS = 11 * 60 * 60
-BATCH_TIMEOUT_SECONDS = 12 * 60 * 60
 REFERENCE_VM = {
     "machine_type": "n2-standard-8",
     "cpu_milli": 8_000,
@@ -82,8 +83,10 @@ def validate_config(config: Mapping[str, object]) -> None:
         raise ValueError("Experiment 1 must use the canonical FHP loader")
     if int(config["q_ensemble_size"]) != 3:
         raise ValueError("The transferred UCV configuration uses three Q folds")
-    if int(config["evaluation_frequency"]) != 1:
-        raise ValueError("A reloadable policy checkpoint is required every iteration")
+    if int(config["evaluation_frequency"]) != 0:
+        raise ValueError("Periodic outer-iteration checkpoints are disabled for FHP")
+    if int(config["max_num_iterations"]) != ITERATION_SAFETY_CAP:
+        raise ValueError("The time-based experiment requires a nonbinding safety cap")
     if bool(config["evaluate_initial_policy"]):
         raise ValueError("Initial-policy evaluation is disabled for FHP")
     if tuple(config["early_evaluation_node_thresholds"]):
@@ -107,7 +110,7 @@ def smoke_config() -> dict:
             "advantage_batch_size": 2,
             "ave_policy_batch_size": 2,
             "baseline_batch_size": 2,
-            "max_num_iterations": 1,
+            "max_num_iterations": ITERATION_SAFETY_CAP,
             "calibration_buffer_size": 128,
             "calibration_batch_size": 2,
             "calibration_train_steps": 1,

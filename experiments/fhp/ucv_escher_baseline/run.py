@@ -34,12 +34,11 @@ from .config import (
     ALGORITHM_LABEL,
     BEST_UCV_CONFIG,
     BEST_UCV_TRAINING_CONFIG_SHA256,
+    CHECKPOINT_TRAINING_SECONDS,
     DEFAULT_SEED,
     EXPERIMENT_ID,
     EXPERIMENT_NAME,
-    MAX_TRAINING_SECONDS,
     REFERENCE_VM,
-    TARGET_NODES,
     smoke_config,
     validate_config,
 )
@@ -116,15 +115,19 @@ def _training_config_sha256(config: Mapping[str, object]) -> str:
 
 
 def _capacity_assessment(summary: Mapping[str, object]) -> str:
-    if summary["stop_reason"] == "node_budget":
-        return "reference_vm_sufficient_for_15m_node_budget"
     memory_fraction = float(summary["peak_rss_mib"]) / float(
         summary["reference_vm"]["memory_mib"]
     )
-    if summary["stop_reason"] == "wall_clock_budget" and memory_fraction < 0.8:
-        return "memory_sufficient_but_compute_or_training_time_is_limiting"
     if memory_fraction >= 0.9:
         return "memory_headroom_is_insufficient"
+    if (
+        summary["stop_reason"] == "training_time_budget"
+        and int(summary["checkpoint_count"]) == 2
+    ):
+        final_target_seconds = float(summary["checkpoint_training_seconds"][-1])
+        if np.isclose(final_target_seconds, 12 * 60 * 60):
+            return "reference_vm_completed_the_12_hour_training_schedule"
+        return "checkpoint_schedule_completed"
     return "inconclusive_check_failure_or_iteration_cap"
 
 
@@ -132,11 +135,22 @@ def run_experiment(
     *,
     seed: int,
     config: Mapping[str, object],
-    target_nodes: int,
-    max_training_seconds: int,
+    checkpoint_training_seconds,
     output_root: Path,
 ) -> Path:
     validate_config(config)
+    checkpoint_training_seconds = tuple(
+        float(value) for value in checkpoint_training_seconds
+    )
+    if len(checkpoint_training_seconds) != 2:
+        raise ValueError("Experiment 1 requires exactly two time checkpoints")
+    if any(
+        left >= right
+        for left, right in zip(
+            checkpoint_training_seconds, checkpoint_training_seconds[1:]
+        )
+    ):
+        raise ValueError("Time checkpoints must be strictly increasing")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_dir = Path(output_root) / f"{EXPERIMENT_NAME}_{timestamp}_seed_{seed}"
     checkpoints_dir = run_dir / "checkpoints"
@@ -148,8 +162,9 @@ def run_experiment(
         "algorithm_id": ALGORITHM_ID,
         "algorithm_label": ALGORITHM_LABEL,
         "seed": int(seed),
-        "target_nodes": int(target_nodes),
-        "max_training_seconds": int(max_training_seconds),
+        "checkpoint_training_seconds": list(checkpoint_training_seconds),
+        "training_duration_seconds": checkpoint_training_seconds[-1],
+        "stopping_rule": "final_training_time_checkpoint",
         "reference_vm": dict(REFERENCE_VM),
         "game": serialisable_game_definition(),
         "training_config": dict(config),
@@ -160,14 +175,16 @@ def run_experiment(
     _write_json(run_dir / "run_manifest.json", manifest)
 
     solver = UnbiasedControlVariateEscher(**_solver_kwargs(seed, config))
-    solver.target_nodes_touched = int(target_nodes)
+    solver.target_nodes_touched = None
     solver.max_num_iterations = int(config["max_num_iterations"])
-    solver.max_wall_clock_seconds = int(max_training_seconds)
+    solver.max_wall_clock_seconds = None
     solver.preserve_evaluation_rng = bool(config["preserve_evaluation_rng"])
     solver.evaluate_initial_policy = bool(config["evaluate_initial_policy"])
     solver.early_evaluation_node_thresholds = tuple(
         int(value) for value in config["early_evaluation_node_thresholds"]
     )
+    solver.training_time_checkpoint_seconds = checkpoint_training_seconds
+    solver.stop_after_final_training_time_checkpoint = True
 
     checkpoint_rows = []
 
@@ -198,6 +215,12 @@ def run_experiment(
                 "wall_clock_seconds": float(
                     raw_checkpoint.get("wall_clock_seconds", float("nan"))
                 ),
+                "training_elapsed_seconds": float(
+                    raw_checkpoint.get("training_elapsed_seconds", float("nan"))
+                ),
+                "checkpoint_target_seconds": float(
+                    raw_checkpoint.get("checkpoint_target_seconds", float("nan"))
+                ),
                 "path": str(checkpoint_path.resolve()),
                 "sha256": sha256_file(checkpoint_path),
                 "size_bytes": checkpoint_path.stat().st_size,
@@ -207,8 +230,19 @@ def run_experiment(
 
     try:
         raw_rows = solver.solve(post_checkpoint_callback=capture_checkpoint)
-        if not checkpoint_rows:
-            raise RuntimeError("Training completed without a reloadable policy checkpoint")
+        actual_targets = tuple(
+            row["checkpoint_target_seconds"] for row in checkpoint_rows
+        )
+        if actual_targets != checkpoint_training_seconds:
+            raise RuntimeError(
+                f"Captured time checkpoints {actual_targets}, expected "
+                f"{checkpoint_training_seconds}"
+            )
+        if solver.stop_reason != "training_time_budget":
+            raise RuntimeError(
+                f"Training stopped for {solver.stop_reason!r}, not after the final "
+                "training-time checkpoint"
+            )
 
         final_source = Path(checkpoint_rows[-1]["path"])
         final_checkpoint = run_dir / "final_policy_checkpoint.pkl"
@@ -227,20 +261,24 @@ def run_experiment(
         _write_csv(run_dir / "checkpoint_rows.csv", raw_rows)
         _write_csv(run_dir / "checkpoint_manifest.csv", checkpoint_rows)
         final_wall_clock = float(raw_rows[-1].get("wall_clock_seconds", 0.0))
+        final_training_elapsed = float(
+            raw_rows[-1].get("training_elapsed_seconds", 0.0)
+        )
         summary = {
             "experiment_id": EXPERIMENT_ID,
             "experiment_name": EXPERIMENT_NAME,
             "algorithm_id": ALGORITHM_ID,
             "seed": int(seed),
             "stop_reason": str(solver.stop_reason),
-            "target_nodes": int(target_nodes),
+            "checkpoint_training_seconds": list(checkpoint_training_seconds),
             "final_nodes_touched": int(solver.nodes_touched),
             "final_outer_iteration": int(solver.num_iteration),
             "final_episode": int(solver.episode),
             "wall_clock_seconds": final_wall_clock,
+            "training_elapsed_seconds": final_training_elapsed,
             "nodes_per_second": (
-                float(solver.nodes_touched) / final_wall_clock
-                if final_wall_clock > 0.0
+                float(solver.nodes_touched) / final_training_elapsed
+                if final_training_elapsed > 0.0
                 else float("nan")
             ),
             "peak_rss_mib": _peak_rss_mib(),
@@ -274,11 +312,13 @@ def run_experiment(
 def _parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
-    parser.add_argument("--target-nodes", type=int, default=TARGET_NODES)
     parser.add_argument(
-        "--max-training-seconds", type=int, default=MAX_TRAINING_SECONDS
+        "--checkpoint-seconds",
+        type=float,
+        nargs=2,
+        metavar=("FIRST", "FINAL"),
+        default=CHECKPOINT_TRAINING_SECONDS,
     )
-    parser.add_argument("--max-iterations", type=int)
     parser.add_argument("--output-root", type=Path, default=Path("outputs"))
     parser.add_argument("--smoke", action="store_true")
     return parser.parse_args(argv)
@@ -291,19 +331,15 @@ def main(argv=None) -> int:
     )
     args = _parse_args(argv)
     config = smoke_config() if args.smoke else deepcopy(BEST_UCV_CONFIG)
-    target_nodes = 500 if args.smoke and args.target_nodes == TARGET_NODES else args.target_nodes
-    max_seconds = (
-        300
-        if args.smoke and args.max_training_seconds == MAX_TRAINING_SECONDS
-        else args.max_training_seconds
+    checkpoint_seconds = (
+        (1e-6, 2e-6)
+        if args.smoke and tuple(args.checkpoint_seconds) == CHECKPOINT_TRAINING_SECONDS
+        else tuple(args.checkpoint_seconds)
     )
-    if args.max_iterations is not None:
-        config["max_num_iterations"] = int(args.max_iterations)
     run_dir = run_experiment(
         seed=args.seed,
         config=config,
-        target_nodes=target_nodes,
-        max_training_seconds=max_seconds,
+        checkpoint_training_seconds=checkpoint_seconds,
         output_root=args.output_root,
     )
     print(run_dir.resolve())
