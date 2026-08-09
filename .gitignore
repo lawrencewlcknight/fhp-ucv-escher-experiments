@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Virtual envs
+venv/
+.venv/
+!venv/PLACEHOLDER.md
+
+# Scratch experiment outputs. Checkpoints and cloud/local results are not
+# committed; every run uploads or retains its own manifest and hashes.
+outputs/*
+!outputs/.gitkeep
+cloud_outputs
+cloud_outputs/
+chart_exports/
+
+# Heavy experiment byproducts
+*.pt
+*.pth
+*.npz
+*.log
+failed_seeds.json
+failed_runs.json
+checkpoints/
+snapshots/
+traces/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

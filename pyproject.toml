@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fhp-poker-escher-architecture-experiments"
+version = "0.1.0"
+description = "UCV-ESCHER architecture experiments for flop hold'em poker"
+requires-python = ">=3.10,<3.13"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+  "adaptive_escher",
+  "adaptive_escher.*",
+  "experiments",
+  "experiments.*",
+  "fhp_escher",
+  "fhp_escher.*",
+  "unbiased_escher",
+  "unbiased_escher.*",
+  "vr_deep_cfr",
+  "vr_deep_cfr.*",
+]
+exclude = ["outputs*", "tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["smoke: end-to-end smoke tests"]
+
+[tool.ruff]
+line-length = 100

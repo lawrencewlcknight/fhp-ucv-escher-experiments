@@ -1,0 +1,7 @@
+numpy==1.26.4
+open_spiel==1.6.3
+psutil==7.2.1
+scipy==1.13.1
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.7.0+cpu; platform_system == "Linux"
+torch==2.7.0; platform_system == "Darwin"
