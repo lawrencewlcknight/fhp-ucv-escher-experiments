@@ -90,3 +90,32 @@ def test_diagnose_recognises_reported_allocator_failure(monkeypatch, tmp_path):
     )
 
     assert result["diagnosis"] == "reported_out_of_memory_exception"
+
+
+def test_cgroup_cpu_counters_are_exposed_in_resource_heartbeats(monkeypatch, tmp_path):
+    (tmp_path / "cpu.stat").write_text(
+        "usage_usec 123456\nuser_usec 100000\nsystem_usec 23456\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        batch_diagnostics,
+        "_candidate_cgroup_directories",
+        lambda: iter((tmp_path,)),
+    )
+
+    cpu = batch_diagnostics._cgroup_cpu()
+    assert cpu["version"] == 2
+    assert cpu["stat"]["usage_usec"] == 123456
+    heartbeat = batch_diagnostics._heartbeat(
+        {
+            "timestamp_utc": "2026-08-09T00:00:00+00:00",
+            "load_average": [1.0, 2.0, 3.0],
+            "logical_cpu_count": 32,
+            "cgroup_memory": {},
+            "cgroup_cpu": cpu,
+            "system_memory": {},
+            "largest_processes": [],
+        }
+    )["resource_heartbeat"]
+    assert heartbeat["logical_cpu_count"] == 32
+    assert heartbeat["cgroup_cpu"] == cpu

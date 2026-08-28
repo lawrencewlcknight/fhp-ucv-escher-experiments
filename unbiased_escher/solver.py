@@ -343,8 +343,12 @@ class ResidualCalibrationTrainer:
             self.model.parameters(),
             lr=float(learning_rate),
         )
-        self.buffer = CalibrationBuffer(buffer_size, self.feature_size)
+        self.buffer_size = int(buffer_size)
+        self.buffer = self.init_buffer()
         self.target_version = 0
+
+    def init_buffer(self):
+        return CalibrationBuffer(self.buffer_size, self.feature_size)
 
     def feature(
         self,
@@ -487,23 +491,27 @@ class UnbiasedControlVariateEscher(VRDeepPDCFRPlus):
                 )
             self.calibration_trainer = None
         else:
-            self.calibration_trainer = ResidualCalibrationTrainer(
-                infostate_size=self.infostate_size,
-                action_size=self.action_size,
-                hidden_layers=self.network_layers,
-                learning_rate=self.calibration_learning_rate,
-                buffer_size=self.calibration_buffer_size,
-                batch_size=self.calibration_batch_size,
-                train_steps=self.calibration_train_steps,
-                device=self.device,
-                minimum_variance=self.calibration_minimum_variance,
-            )
+            self.init_calibration_trainer()
         self.gate_controller = PredictorGateController(
             self.num_players,
             ema_decay=self.prediction_gate_ema_decay,
             initial_gate=self.prediction_gate_initial,
         )
         self._reset_architecture_diagnostics()
+
+    def init_calibration_trainer(self):
+        """Construct the residual learner; efficient variants override this hook."""
+        self.calibration_trainer = ResidualCalibrationTrainer(
+            infostate_size=self.infostate_size,
+            action_size=self.action_size,
+            hidden_layers=self.network_layers,
+            learning_rate=self.calibration_learning_rate,
+            buffer_size=self.calibration_buffer_size,
+            batch_size=self.calibration_batch_size,
+            train_steps=self.calibration_train_steps,
+            device=self.device,
+            minimum_variance=self.calibration_minimum_variance,
+        )
 
     def init_regret_trainers(self):
         if self.use_instantaneous_predictor:

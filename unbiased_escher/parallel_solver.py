@@ -68,6 +68,10 @@ def _circular_payload(buffer) -> dict[str, np.ndarray]:
 
 
 def _append_reservoir(buffer, payload: Mapping[str, np.ndarray]) -> None:
+    add_batch = getattr(buffer, "add_batch", None)
+    if callable(add_batch):
+        add_batch(payload)
+        return
     for sample in zip(
         payload["infostates"],
         payload["values"],
@@ -119,6 +123,8 @@ def _append_calibration(buffer, payload: Mapping[str, np.ndarray]) -> None:
 class UCVEscherTraversalWorker:
     """CPU-only Ray actor with inference networks and bounded scratch replay."""
 
+    SOLVER_CLASS = UnbiasedControlVariateEscher
+
     def __init__(
         self,
         game_name: str,
@@ -166,7 +172,8 @@ class UCVEscherTraversalWorker:
             }
         )
         self._max_traversals = max_traversals
-        self._solver = UnbiasedControlVariateEscher(**kwargs)
+        self._loaded_snapshot_token = None
+        self._solver = self.SOLVER_CLASS(**kwargs)
         self._solver.regret_trainers[1].buffer = (
             self._solver.regret_trainers[0].buffer
         )
@@ -187,22 +194,26 @@ class UCVEscherTraversalWorker:
             ),
         }
         for buffer in reservoir_buffers.values():
-            buffer.infostate_buf = buffer.infostate_buf.astype(np.float32)
-            buffer.q_value_buf = buffer.q_value_buf.astype(np.float32)
-            buffer.q_value_mask_buf = buffer.q_value_mask_buf.astype(np.float32)
-            buffer.iteration_buf = buffer.iteration_buf.astype(np.float32)
+            buffer.infostate_buf = buffer.infostate_buf.astype(np.float32, copy=False)
+            buffer.q_value_buf = buffer.q_value_buf.astype(np.float32, copy=False)
+            buffer.q_value_mask_buf = buffer.q_value_mask_buf.astype(
+                np.float32, copy=False
+            )
+            buffer.iteration_buf = buffer.iteration_buf.astype(np.float32, copy=False)
         for member in self._solver.q_value_trainer.members:
             buffer = member.buffer
-            buffer.history_buf = buffer.history_buf.astype(np.float32)
-            buffer.next_history_buf = buffer.next_history_buf.astype(np.float32)
-            buffer.next_state_buf = buffer.next_state_buf.astype(np.float32)
-            buffer.reward_buf = buffer.reward_buf.astype(np.float32)
-            buffer.action_buf = buffer.action_buf.astype(np.int16)
-            buffer.next_legal_actions_mask_buf = (
-                buffer.next_legal_actions_mask_buf.astype(np.int8)
+            buffer.history_buf = buffer.history_buf.astype(np.float32, copy=False)
+            buffer.next_history_buf = buffer.next_history_buf.astype(
+                np.float32, copy=False
             )
-            buffer.next_player_buf = buffer.next_player_buf.astype(np.int8)
-            buffer.done_buf = buffer.done_buf.astype(np.int8)
+            buffer.next_state_buf = buffer.next_state_buf.astype(np.float32, copy=False)
+            buffer.reward_buf = buffer.reward_buf.astype(np.float32, copy=False)
+            buffer.action_buf = buffer.action_buf.astype(np.int16, copy=False)
+            buffer.next_legal_actions_mask_buf = (
+                buffer.next_legal_actions_mask_buf.astype(np.int8, copy=False)
+            )
+            buffer.next_player_buf = buffer.next_player_buf.astype(np.int8, copy=False)
+            buffer.done_buf = buffer.done_buf.astype(np.int8, copy=False)
 
     def _set_inference_mode(self) -> None:
         for trainer in self._solver.regret_trainers:
@@ -257,16 +268,27 @@ class UCVEscherTraversalWorker:
         n: int,
         traverser: int,
         trajectory_start: int,
-        snapshot: Mapping[str, Any],
+        snapshot: Mapping[str, Any] | None,
         iteration: int,
+        snapshot_token: int | None = None,
     ) -> dict[str, Any]:
         n = int(n)
         if n < 0 or n > self._max_traversals:
             raise ValueError(
                 f"Requested {n} traversals; worker capacity is {self._max_traversals}"
             )
+        total_started_at = time.perf_counter()
         self._clear_collection_buffers()
-        self._load_snapshot(snapshot, int(iteration))
+        snapshot_started_at = time.perf_counter()
+        snapshot_reloaded = (
+            snapshot_token is None or snapshot_token != self._loaded_snapshot_token
+        )
+        if snapshot_reloaded:
+            if snapshot is None:
+                raise RuntimeError("A new snapshot token requires snapshot model state")
+            self._load_snapshot(snapshot, int(iteration))
+            self._loaded_snapshot_token = snapshot_token
+        snapshot_load_seconds = time.perf_counter() - snapshot_started_at
         before_nodes = int(self._solver.nodes_touched)
         started_at = time.perf_counter()
         with torch.inference_mode():
@@ -289,20 +311,27 @@ class UCVEscherTraversalWorker:
                 "features": np.asarray(calibration.buffer.features[:size]).copy(),
                 "targets": np.asarray(calibration.buffer.targets[:size]).copy(),
             }
+        regret_payload = _reservoir_payload(
+            self._solver.regret_trainers[int(traverser)].buffer
+        )
+        average_policy_payload = _reservoir_payload(
+            self._solver.ave_policy_trainer.buffer
+        )
+        q_payloads = [
+            _circular_payload(member.buffer)
+            for member in self._solver.q_value_trainer.members
+        ]
+        worker_total_seconds = time.perf_counter() - total_started_at
         return {
             "nodes_touched": int(self._solver.nodes_touched - before_nodes),
             "num_trajectories": n,
             "worker_collection_seconds": float(elapsed),
-            "regret": _reservoir_payload(
-                self._solver.regret_trainers[int(traverser)].buffer
-            ),
-            "average_policy": _reservoir_payload(
-                self._solver.ave_policy_trainer.buffer
-            ),
-            "q_folds": [
-                _circular_payload(member.buffer)
-                for member in self._solver.q_value_trainer.members
-            ],
+            "worker_total_seconds": float(worker_total_seconds),
+            "worker_snapshot_load_seconds": float(snapshot_load_seconds),
+            "worker_snapshot_reloaded": int(snapshot_reloaded),
+            "regret": regret_payload,
+            "average_policy": average_policy_payload,
+            "q_folds": q_payloads,
             "calibration": calibration_payload,
             "architecture_stats": dict(self._solver._architecture_stats),
             "minimum_sample_probability": float(
@@ -324,7 +353,9 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         parallel_ray_object_store_memory: int | None = None,
         parallelize_independent_learners: bool = True,
         parallel_learner_threads: int | None = None,
+        parallel_learner_intraop_threads: int | None = None,
         parallel_collection_chunk_size: int = DEFAULT_COLLECTION_CHUNK_SIZE,
+        parallel_cache_actor_snapshots: bool = False,
         **solver_kwargs,
     ):
         self._parallel_num_workers = int(parallel_num_workers)
@@ -350,9 +381,21 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         )
         if self._parallel_learner_threads is not None and self._parallel_learner_threads < 1:
             raise ValueError("parallel_learner_threads must be positive")
+        self._parallel_learner_intraop_threads = (
+            None
+            if parallel_learner_intraop_threads is None
+            else int(parallel_learner_intraop_threads)
+        )
+        if (
+            self._parallel_learner_intraop_threads is not None
+            and self._parallel_learner_intraop_threads < 1
+        ):
+            raise ValueError("parallel_learner_intraop_threads must be positive")
         self._parallel_collection_chunk_size = int(parallel_collection_chunk_size)
         if self._parallel_collection_chunk_size <= 0:
             raise ValueError("parallel_collection_chunk_size must be positive")
+        self._parallel_cache_actor_snapshots = bool(parallel_cache_actor_snapshots)
+        self._parallel_snapshot_token = 0
 
         worker_solver_kwargs = dict(solver_kwargs)
         if args:
@@ -369,9 +412,15 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         self._owns_ray_runtime = False
         self._cumulative_parallel_collection_seconds = 0.0
         self._cumulative_worker_collection_seconds = 0.0
+        self._cumulative_worker_total_seconds = 0.0
+        self._cumulative_worker_snapshot_load_seconds = 0.0
+        self._parallel_worker_snapshot_reload_count = 0
         self._cumulative_parallel_sync_seconds = 0.0
         self._cumulative_parallel_merge_seconds = 0.0
         self._cumulative_parallel_learner_seconds = 0.0
+        self._cumulative_parallel_regret_seconds = 0.0
+        self._cumulative_parallel_holdout_seconds = 0.0
+        self._cumulative_parallel_worker_imbalance_seconds = 0.0
         self._parallel_peak_result_bytes = 0
         self._parallel_dispatch_count = 0
         self._effective_parallel_learner_threads = min(
@@ -411,7 +460,7 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                     )
                 ray.init(**init_kwargs)
 
-            worker_class = ray.remote(num_cpus=1)(UCVEscherTraversalWorker)
+            worker_class = ray.remote(num_cpus=1)(self._traversal_worker_class())
             self._workers = [
                 worker_class.remote(
                     game_name,
@@ -425,6 +474,9 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         except Exception:
             self.close()
             raise
+
+    def _traversal_worker_class(self):
+        return UCVEscherTraversalWorker
 
     @property
     def execution_backend(self) -> str:
@@ -512,6 +564,7 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         trajectory_start: int,
         count: int,
         snapshot_ref,
+        snapshot_token: int | None = None,
     ) -> int:
         counts = partition_total(count, self._parallel_num_workers)
         starts = []
@@ -526,6 +579,7 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                 int(start),
                 snapshot_ref,
                 int(self.num_iteration),
+                snapshot_token,
             )
             for worker, worker_count, start in zip(self._workers, counts, starts)
             if int(worker_count) > 0
@@ -536,6 +590,23 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
             float(result["worker_collection_seconds"])
             for result in results
         )
+        self._cumulative_worker_total_seconds += sum(
+            float(result["worker_total_seconds"])
+            for result in results
+        )
+        self._cumulative_worker_snapshot_load_seconds += sum(
+            float(result["worker_snapshot_load_seconds"])
+            for result in results
+        )
+        self._parallel_worker_snapshot_reload_count += sum(
+            int(result["worker_snapshot_reloaded"])
+            for result in results
+        )
+        worker_totals = [float(result["worker_total_seconds"]) for result in results]
+        if worker_totals:
+            self._cumulative_parallel_worker_imbalance_seconds += (
+                max(worker_totals) - min(worker_totals)
+            )
 
         merge_start = time.perf_counter()
         for result in results:
@@ -559,8 +630,13 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         collection_start = time.perf_counter()
         sync_start = time.perf_counter()
         snapshot_ref = self._ray.put(self._inference_snapshot())
+        snapshot_token = None
+        if self._parallel_cache_actor_snapshots:
+            self._parallel_snapshot_token += 1
+            snapshot_token = self._parallel_snapshot_token
         self._cumulative_parallel_sync_seconds += time.perf_counter() - sync_start
         remaining = int(self.num_traversals)
+        first_dispatch = True
         try:
             while remaining > 0:
                 chunk_count = min(remaining, self._parallel_collection_chunk_size)
@@ -569,12 +645,18 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                     player=int(player),
                     trajectory_start=int(self.episode) + 1,
                     count=chunk_count,
-                    snapshot_ref=snapshot_ref,
+                    snapshot_ref=(
+                        snapshot_ref
+                        if first_dispatch or not self._parallel_cache_actor_snapshots
+                        else None
+                    ),
+                    snapshot_token=snapshot_token,
                 )
                 self._cumulative_parallel_collection_seconds += (
                     time.perf_counter() - dispatch_start
                 )
                 remaining -= collected
+                first_dispatch = False
                 self._maybe_run_early_node_checkpoint()
                 self._maybe_run_training_time_checkpoint()
                 if self._stop_requested:
@@ -602,7 +684,10 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         )
         self._effective_parallel_learner_threads = max_workers
         original_torch_threads = int(torch.get_num_threads())
-        per_task_threads = max(1, original_torch_threads // max_workers)
+        per_task_threads = (
+            self._parallel_learner_intraop_threads
+            or max(1, original_torch_threads // max_workers)
+        )
         torch.set_num_threads(per_task_threads)
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -644,8 +729,16 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
             self.collect_training_data(player)
             if self._stop_requested:
                 return
+            holdout_start = time.perf_counter()
             holdout_errors.append(self._predictor_holdout_error(player))
+            self._cumulative_parallel_holdout_seconds += (
+                time.perf_counter() - holdout_start
+            )
+            regret_start = time.perf_counter()
             self.train_regret(player)
+            self._cumulative_parallel_regret_seconds += (
+                time.perf_counter() - regret_start
+            )
         for player, (prediction_mse, zero_mse) in enumerate(holdout_errors):
             self.gate_controller.observe(player, prediction_mse, zero_mse)
             if self.force_prediction_gate_zero or not self.use_instantaneous_predictor:
@@ -685,6 +778,18 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
             self._cumulative_worker_collection_seconds,
         )
         self.logger.record(
+            "cumulative_worker_total_seconds",
+            self._cumulative_worker_total_seconds,
+        )
+        self.logger.record(
+            "cumulative_worker_snapshot_load_seconds",
+            self._cumulative_worker_snapshot_load_seconds,
+        )
+        self.logger.record(
+            "parallel_worker_snapshot_reload_count",
+            self._parallel_worker_snapshot_reload_count,
+        )
+        self.logger.record(
             "cumulative_parallel_sync_seconds",
             self._cumulative_parallel_sync_seconds,
         )
@@ -697,8 +802,35 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
             self._cumulative_parallel_learner_seconds,
         )
         self.logger.record(
+            "cumulative_parallel_regret_seconds",
+            self._cumulative_parallel_regret_seconds,
+        )
+        self.logger.record(
+            "cumulative_parallel_holdout_seconds",
+            self._cumulative_parallel_holdout_seconds,
+        )
+        self.logger.record(
+            "cumulative_parallel_worker_imbalance_seconds",
+            self._cumulative_parallel_worker_imbalance_seconds,
+        )
+        self.logger.record(
             "parallel_independent_learner_threads",
             self._effective_parallel_learner_threads,
+        )
+        self.logger.record(
+            "parallel_learner_intraop_threads",
+            (
+                self._parallel_learner_intraop_threads
+                or max(
+                    1,
+                    int(torch.get_num_threads())
+                    // max(1, self._effective_parallel_learner_threads),
+                )
+            ),
+        )
+        self.logger.record(
+            "parallel_cache_actor_snapshots",
+            int(self._parallel_cache_actor_snapshots),
         )
         self.logger.record(
             "parallel_peak_worker_result_mib",

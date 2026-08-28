@@ -113,6 +113,31 @@ and parallel-over-sequential node throughput at 6 and 12 hours. These are
 systems and training-progress measurements, not exact exploitability. Policy
 quality comparison should use sampled evaluation of the saved checkpoints.
 
+## exp4_fhp_ucv_escher_cpu_optimized
+
+Experiment 4 is the high-throughput CPU arm. It retains Experiment 1's UCV
+estimator, network architecture, optimiser and learner-step counts, 10,000
+traversals per player, synchronous player-update ordering, frozen inference
+targets, seed, and 6-hour/12-hour checkpoint schedule.
+
+The execution backend uses 28 traversal actors on the 32-vCPU reference VM,
+two 5,000-trajectory dispatches per player, actor-side snapshot caching, compact
+typed driver replay, vectorised exact Algorithm-R reservoir ingestion,
+vectorised without-replacement minibatch selection with independent per-buffer
+RNGs, and four concurrent learners with an explicit four-thread intra-op budget.
+These are systems optimisations; they do not alter the UCV estimator or multiply
+the configured traversal or gradient-update budgets.
+
+Local smoke test:
+
+```bash
+python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run --smoke
+```
+
+The run records compact replay allocation, worker snapshot reload time, actor
+time, merge time, learner time, payload size, dispatch count, and thread/worker
+settings in its checkpoint rows and final summary.
+
 ## Google Cloud Batch
 
 Before submitting any job, configure the Google Cloud project, region, results
@@ -219,11 +244,42 @@ JOB_NAME="exp3-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
   c4-standard-32 50400 32000 120000 200
 ```
 
+### Experiment 4: exp4_fhp_ucv_escher_cpu_optimized
+
+#### GCP Batch smoke test
+
+```bash
+JOB_NAME="exp4-fhp-ucv-cpu-optimized-smoke-$(date -u +%Y%m%d-%H%M%S)"
+
+./gcp/submit_batch_experiment.sh \
+  "$JOB_NAME" \
+  "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
+    --smoke --output-root outputs/cloud/$JOB_NAME" \
+  n2-standard-4 7200 4000 16000 100
+```
+
+#### GCP Batch full run
+
+Experiment 4 uses `c4-standard-32`, 32 vCPUs, 120,000 MiB of requested memory,
+an 8 GiB Ray object store within that allocation, a 200 GiB boot disk, and a
+14-hour Batch limit.
+
+```bash
+JOB_NAME="exp4-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
+
+./gcp/submit_batch_experiment.sh \
+  "$JOB_NAME" \
+  "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
+    --output-root outputs/cloud/$JOB_NAME" \
+  c4-standard-32 50400 32000 120000 200
+```
+
 The cleanup trap uploads outputs from smoke and full runs even after a failed
 job. An independent monitor writes `resource_snapshots.jsonl` every 15 seconds,
 including cgroup memory current/peak/limit values, OOM counters, system memory,
-disk use, load, and the largest processes. Compact resource heartbeats also
-reach Cloud Logging every minute. On cleanup, `batch_diagnostics.json` preserves
+disk use, load, cgroup CPU counters, per-process CPU ticks, and the largest
+processes. Compact resource heartbeats also reach Cloud Logging every minute.
+On cleanup, `batch_diagnostics.json` preserves
 the detailed evidence and `batch_status.json` classifies confirmed cgroup OOM,
 reported allocator errors, probable OOM/SIGKILL, timeout/termination, Python
 exceptions, and other nonzero exits. The run log also attempts to capture

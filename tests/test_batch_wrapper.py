@@ -71,10 +71,14 @@ def test_readme_documents_gcp_smoke_and_full_runs_for_all_experiments():
             "exp3-fhp-ucv-parallel",
             "experiments.fhp.exp3_ucv_escher_parallel.run",
         ),
+        (
+            "exp4-fhp-ucv-cpu-optimized",
+            "experiments.fhp.exp4_ucv_escher_cpu_optimized.run",
+        ),
     )
 
-    assert batch_section.count("#### GCP Batch smoke test") == 3
-    assert batch_section.count("#### GCP Batch full run") == 3
+    assert batch_section.count("#### GCP Batch smoke test") == 4
+    assert batch_section.count("#### GCP Batch full run") == 4
     for job_prefix, module in experiments:
         assert f'JOB_NAME="{job_prefix}-smoke-' in batch_section
         assert f'JOB_NAME="{job_prefix}-full-' in batch_section

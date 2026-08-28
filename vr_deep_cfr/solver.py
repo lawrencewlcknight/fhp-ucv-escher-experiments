@@ -579,12 +579,19 @@ class Trainer:
         self.device = device
 
         self.model = self.init_model()
-        self.buffer = ReservoirBuffer(
-            self.buffer_size, self.input_size, self.output_size, device=self.device
-        )
+        self.buffer = self.init_buffer()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.loss_fn = nn.MSELoss()
         self.softmax_fn = nn.Softmax(dim=-1)
+
+    def init_buffer(self):
+        """Construct replay storage; specialised trainers may override this hook."""
+        return ReservoirBuffer(
+            self.buffer_size,
+            self.input_size,
+            self.output_size,
+            device=self.device,
+        )
 
     def init_model(self):
         model = MLP(self.input_size, self.network_layers, self.output_size).to(
@@ -924,6 +931,7 @@ class QValueTrainer(Trainer):
         regret_trainers: list[RegretTrainer],
         device: str = "cpu",
     ):
+        self.state_size = state_size
         super().__init__(
             history_size,
             action_size,
@@ -935,19 +943,20 @@ class QValueTrainer(Trainer):
             logger,
             device,
         )
-        self.state_size = state_size
-        self.buffer = CircularBuffer(
-            self.buffer_size,
-            self.input_size,
-            state_size,
-            self.output_size,
-            device=self.device,
-        )
         self.model = self.init_model()
         self.target_model = self.init_model()
         self.target_model.load_state_dict(self.model.state_dict())
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.regret_trainers = regret_trainers
+
+    def init_buffer(self):
+        return CircularBuffer(
+            self.buffer_size,
+            self.input_size,
+            self.state_size,
+            self.output_size,
+            device=self.device,
+        )
 
     def init_model(self):
         model = MLP(self.input_size, self.network_layers, self.output_size).to(

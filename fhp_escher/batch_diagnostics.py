@@ -108,6 +108,26 @@ def _cgroup_memory() -> dict[str, object]:
     return {"available": False}
 
 
+def _cgroup_cpu() -> dict[str, object]:
+    """Return cumulative cgroup CPU counters for utilisation calculations."""
+    for base in _candidate_cgroup_directories():
+        cpu_stat = base / "cpu.stat"
+        if cpu_stat.exists():
+            return {
+                "version": 2,
+                "path": str(base),
+                "stat": _key_value_file(cpu_stat),
+            }
+        cpuacct_usage = _read_int(base / "cpuacct.usage")
+        if cpuacct_usage is not None:
+            return {
+                "version": 1,
+                "path": str(base),
+                "usage_nanoseconds": cpuacct_usage,
+            }
+    return {"available": False}
+
+
 def _system_memory() -> dict[str, int]:
     values: dict[str, int] = {}
     contents = _read_text(Path("/proc/meminfo")) or ""
@@ -149,6 +169,15 @@ def _process_snapshot(limit: int = 20) -> list[dict[str, object]]:
             except (ValueError, IndexError):
                 return 0
 
+        stat = _read_text(process_dir / "stat") or ""
+        stat_tail = stat[stat.rfind(")") + 2 :].split() if ")" in stat else []
+
+        def stat_field(index: int) -> int:
+            try:
+                return int(stat_tail[index])
+            except (ValueError, IndexError):
+                return 0
+
         rows.append(
             {
                 "pid": int(process_dir.name),
@@ -158,6 +187,8 @@ def _process_snapshot(limit: int = 20) -> list[dict[str, object]]:
                 "peak_rss_bytes": kib_field("VmHWM"),
                 "virtual_bytes": kib_field("VmSize"),
                 "threads": int(fields.get("Threads", "0")),
+                "user_cpu_ticks": stat_field(11),
+                "system_cpu_ticks": stat_field(12),
             }
         )
     rows.sort(key=lambda row: int(row["rss_bytes"]), reverse=True)
@@ -173,8 +204,10 @@ def take_snapshot() -> dict[str, object]:
     return {
         "timestamp_utc": _utc_now(),
         "load_average": load_average,
+        "logical_cpu_count": os.cpu_count(),
         "system_memory": _system_memory(),
         "cgroup_memory": _cgroup_memory(),
+        "cgroup_cpu": _cgroup_cpu(),
         "disk": {
             "total_bytes": disk.total,
             "used_bytes": disk.used,
@@ -186,6 +219,7 @@ def take_snapshot() -> dict[str, object]:
 
 def _heartbeat(snapshot: dict[str, object]) -> dict[str, object]:
     cgroup = snapshot.get("cgroup_memory", {})
+    cgroup_cpu = snapshot.get("cgroup_cpu", {})
     system = snapshot.get("system_memory", {})
     processes = snapshot.get("largest_processes", [])
     largest_process = processes[0] if isinstance(processes, list) and processes else None
@@ -193,7 +227,9 @@ def _heartbeat(snapshot: dict[str, object]) -> dict[str, object]:
         "resource_heartbeat": {
             "timestamp_utc": snapshot.get("timestamp_utc"),
             "load_average": snapshot.get("load_average"),
+            "logical_cpu_count": snapshot.get("logical_cpu_count"),
             "cgroup_memory": cgroup,
+            "cgroup_cpu": cgroup_cpu,
             "system_available_bytes": (
                 system.get("memavailable_bytes") if isinstance(system, dict) else None
             ),

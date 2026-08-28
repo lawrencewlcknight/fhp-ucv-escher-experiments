@@ -338,7 +338,15 @@ def run_experiment(
         summary["execution_metrics"] = {
             key: value
             for key, value in raw_rows[-1].items()
-            if key.startswith("parallel_") or key.startswith("cumulative_parallel_")
+            if key.startswith(
+                (
+                    "parallel_",
+                    "cumulative_parallel_",
+                    "cumulative_worker_",
+                    "efficient_",
+                    "central_replay_",
+                )
+            )
         }
         summary["capacity_assessment"] = _capacity_assessment(summary)
         _write_json(run_dir / "summary.json", summary)
