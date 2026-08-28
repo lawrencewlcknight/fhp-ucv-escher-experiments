@@ -50,3 +50,35 @@ def test_generated_batch_script_has_valid_shell_and_diagnostics(tmp_path, monkey
     assert "--cloud-log-every 4" in generated
     assert "batch_diagnostics.json" in generated
     assert "--experiment-exit-code" in generated
+
+
+def test_readme_documents_gcp_smoke_and_full_runs_for_all_experiments():
+    root = Path(__file__).resolve().parents[1]
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    batch_section = readme.split("## Google Cloud Batch", 1)[1].split(
+        "## Verification", 1
+    )[0]
+    experiments = (
+        (
+            "exp1-fhp-ucv-baseline",
+            "experiments.fhp.exp1_ucv_escher_baseline.run",
+        ),
+        (
+            "exp2-fhp-ucv-sequential",
+            "experiments.fhp.exp2_ucv_escher_sequential.run",
+        ),
+        (
+            "exp3-fhp-ucv-parallel",
+            "experiments.fhp.exp3_ucv_escher_parallel.run",
+        ),
+    )
+
+    assert batch_section.count("#### GCP Batch smoke test") == 3
+    assert batch_section.count("#### GCP Batch full run") == 3
+    for job_prefix, module in experiments:
+        assert f'JOB_NAME="{job_prefix}-smoke-' in batch_section
+        assert f'JOB_NAME="{job_prefix}-full-' in batch_section
+        commands = batch_section.split(f"python -m {module}", 2)
+        assert len(commands) == 3
+        assert "--smoke" in commands[1].split('"', 1)[0]
+        assert "--smoke" not in commands[2].split('"', 1)[0]
