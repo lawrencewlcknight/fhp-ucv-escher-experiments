@@ -1,11 +1,12 @@
 import hashlib
 import json
 
-from experiments.fhp.ucv_escher_baseline.config import (
+from experiments.fhp.exp1_ucv_escher_baseline.config import (
     BEST_UCV_CONFIG,
     BEST_UCV_TRAINING_CONFIG_SHA256,
     BATCH_TIMEOUT_SECONDS,
     CHECKPOINT_TRAINING_SECONDS,
+    EXPERIMENT_NAME,
     ITERATION_SAFETY_CAP,
     REFERENCE_VM,
     TRAINING_DURATION_SECONDS,
@@ -15,6 +16,7 @@ from experiments.fhp.ucv_escher_baseline.config import (
 
 def test_experiment_1_budget_and_reference_vm():
     validate_config(BEST_UCV_CONFIG)
+    assert EXPERIMENT_NAME == "exp1_fhp_ucv_escher_baseline"
     assert CHECKPOINT_TRAINING_SECONDS == (21_600, 43_200)
     assert TRAINING_DURATION_SECONDS == 43_200
     assert BATCH_TIMEOUT_SECONDS == 50_400

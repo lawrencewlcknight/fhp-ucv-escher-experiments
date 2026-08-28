@@ -7,7 +7,7 @@ from typing import Mapping
 
 
 EXPERIMENT_ID = 1
-EXPERIMENT_NAME = "fhp_ucv_escher_baseline"
+EXPERIMENT_NAME = "exp1_fhp_ucv_escher_baseline"
 ALGORITHM_ID = "ucv_escher"
 ALGORITHM_LABEL = "UCV-ESCHER"
 DEFAULT_SEED = 0

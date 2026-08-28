@@ -25,7 +25,7 @@ VR-Deep FHP contract:
 The exact parameter mapping is tested so a silent game-definition change fails
 CI. Provenance is recorded in [`fhp_escher/game.py`](fhp_escher/game.py).
 
-## Experiment 1
+## exp1_fhp_ucv_escher_baseline
 
 Experiment 1 transfers the selected UCV-ESCHER architecture and optimisation
 settings to FHP and trains by elapsed training time rather than a node budget.
@@ -39,16 +39,21 @@ are disabled. Exact tabular exploitability is intentionally not attempted
 because enumerating the FHP tree is impractical. The saved policies are designed
 for sampled head-to-head evaluation.
 
+Experiment packages, canonical experiment names, output directories, and
+numbered checkpoint filenames use an `expN_` prefix (for example,
+`exp1_fhp_ucv_escher_baseline`). Google Cloud job IDs use the corresponding
+hyphenated `expN-` prefix because underscores are not valid in Batch job names.
+
 Local orchestration smoke test:
 
 ```bash
-python -m experiments.fhp.ucv_escher_baseline.run --smoke
+python -m experiments.fhp.exp1_ucv_escher_baseline.run --smoke
 ```
 
 Full run:
 
 ```bash
-python -m experiments.fhp.ucv_escher_baseline.run
+python -m experiments.fhp.exp1_ucv_escher_baseline.run
 ```
 
 Outputs include:
@@ -76,11 +81,11 @@ The reference machine remains `n2-standard-8` with 8 vCPUs and 32 GB RAM.
 After setting `PROJECT_ID`, `REGION`, `BUCKET`, and `SA_EMAIL`, submit:
 
 ```bash
-JOB_NAME="fhp-escher-exp1-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp1-fhp-escher-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.ucv_escher_baseline.run \
+  "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-8 50400 8000 32000 100
 ```

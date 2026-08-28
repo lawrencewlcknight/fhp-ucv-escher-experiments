@@ -17,7 +17,9 @@ def test_generated_batch_script_has_valid_shell_and_diagnostics(tmp_path, monkey
     environment = {
         "JOB_JSON": str(job_json),
         "JOB_NAME": "diagnostics-shell-test",
-        "EXPERIMENT_COMMAND": "python -m experiments.fhp.ucv_escher_baseline.run",
+        "EXPERIMENT_COMMAND": (
+            "python -m experiments.fhp.exp1_ucv_escher_baseline.run"
+        ),
         "MACHINE_TYPE": "n2-standard-8",
         "MAX_RUN_SECONDS": "50400",
         "CPU_MILLI": "8000",

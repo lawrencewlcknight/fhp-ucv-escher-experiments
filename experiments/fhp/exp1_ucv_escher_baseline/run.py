@@ -192,7 +192,7 @@ def run_experiment(
         index = len(checkpoint_rows)
         kind = str(raw_checkpoint.get("checkpoint_kind", "checkpoint"))
         filename = (
-            f"fhp_ucv_escher_{index:03d}_iter_{active_solver.num_iteration:04d}_"
+            f"exp1_fhp_ucv_escher_{index:03d}_iter_{active_solver.num_iteration:04d}_"
             f"{kind}.pkl"
         )
         checkpoint_path = save_policy_checkpoint(
