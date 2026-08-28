@@ -137,13 +137,23 @@ def run_experiment(
     config: Mapping[str, object],
     checkpoint_training_seconds,
     output_root: Path,
+    experiment_id: int = EXPERIMENT_ID,
+    experiment_name: str = EXPERIMENT_NAME,
+    algorithm_id: str = ALGORITHM_ID,
+    algorithm_label: str = ALGORITHM_LABEL,
+    reference_vm: Mapping[str, object] = REFERENCE_VM,
+    solver_class=UnbiasedControlVariateEscher,
+    solver_extra_kwargs: Mapping[str, object] | None = None,
+    checkpoint_prefix: str = "exp1_fhp_ucv_escher",
+    execution_backend: str = "sequential",
+    implementation_provenance: Mapping[str, object] | None = None,
 ) -> Path:
     validate_config(config)
     checkpoint_training_seconds = tuple(
         float(value) for value in checkpoint_training_seconds
     )
     if len(checkpoint_training_seconds) != 2:
-        raise ValueError("Experiment 1 requires exactly two time checkpoints")
+        raise ValueError("Time-bound FHP experiments require exactly two checkpoints")
     if any(
         left >= right
         for left, right in zip(
@@ -152,29 +162,49 @@ def run_experiment(
     ):
         raise ValueError("Time checkpoints must be strictly increasing")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    run_dir = Path(output_root) / f"{EXPERIMENT_NAME}_{timestamp}_seed_{seed}"
+    run_dir = Path(output_root) / f"{experiment_name}_{timestamp}_seed_{seed}"
     checkpoints_dir = run_dir / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=False)
 
     manifest = {
-        "experiment_id": EXPERIMENT_ID,
-        "experiment_name": EXPERIMENT_NAME,
-        "algorithm_id": ALGORITHM_ID,
-        "algorithm_label": ALGORITHM_LABEL,
+        "experiment_id": int(experiment_id),
+        "experiment_name": str(experiment_name),
+        "algorithm_id": str(algorithm_id),
+        "algorithm_label": str(algorithm_label),
+        "execution_backend": str(execution_backend),
         "seed": int(seed),
         "checkpoint_training_seconds": list(checkpoint_training_seconds),
         "training_duration_seconds": checkpoint_training_seconds[-1],
         "stopping_rule": "final_training_time_checkpoint",
-        "reference_vm": dict(REFERENCE_VM),
+        "reference_vm": dict(reference_vm),
         "game": serialisable_game_definition(),
         "training_config": dict(config),
         "training_config_sha256": _training_config_sha256(config),
         "selected_full_config_sha256": BEST_UCV_TRAINING_CONFIG_SHA256,
         "started_utc": datetime.now(timezone.utc).isoformat(),
     }
+    if solver_extra_kwargs:
+        manifest["execution_config"] = dict(solver_extra_kwargs)
+    if implementation_provenance:
+        manifest["implementation_provenance"] = dict(implementation_provenance)
     _write_json(run_dir / "run_manifest.json", manifest)
 
-    solver = UnbiasedControlVariateEscher(**_solver_kwargs(seed, config))
+    active_solver_kwargs = _solver_kwargs(seed, config)
+    active_solver_kwargs.update(dict(solver_extra_kwargs or {}))
+    try:
+        solver = solver_class(**active_solver_kwargs)
+    except BaseException as exc:
+        _write_json(
+            run_dir / "failure.json",
+            {
+                "phase": "solver_initialization",
+                "exception_type": type(exc).__name__,
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+                "peak_rss_mib": _peak_rss_mib(),
+            },
+        )
+        raise
     solver.target_nodes_touched = None
     solver.max_num_iterations = int(config["max_num_iterations"])
     solver.max_wall_clock_seconds = None
@@ -189,10 +219,19 @@ def run_experiment(
     checkpoint_rows = []
 
     def capture_checkpoint(active_solver, raw_checkpoint):
+        raw_checkpoint = dict(raw_checkpoint)
+        raw_checkpoint.update(
+            {
+                "experiment_id": int(experiment_id),
+                "experiment_name": str(experiment_name),
+                "algorithm_id": str(algorithm_id),
+                "execution_backend": str(execution_backend),
+            }
+        )
         index = len(checkpoint_rows)
         kind = str(raw_checkpoint.get("checkpoint_kind", "checkpoint"))
         filename = (
-            f"exp1_fhp_ucv_escher_{index:03d}_iter_{active_solver.num_iteration:04d}_"
+            f"{checkpoint_prefix}_{index:03d}_iter_{active_solver.num_iteration:04d}_"
             f"{kind}.pkl"
         )
         checkpoint_path = save_policy_checkpoint(
@@ -208,6 +247,9 @@ def run_experiment(
         checkpoint_rows.append(
             {
                 "checkpoint_index": index,
+                "experiment_id": int(experiment_id),
+                "experiment_name": str(experiment_name),
+                "execution_backend": str(execution_backend),
                 "checkpoint_kind": kind,
                 "outer_iteration": int(active_solver.num_iteration),
                 "episode": int(active_solver.episode),
@@ -265,9 +307,11 @@ def run_experiment(
             raw_rows[-1].get("training_elapsed_seconds", 0.0)
         )
         summary = {
-            "experiment_id": EXPERIMENT_ID,
-            "experiment_name": EXPERIMENT_NAME,
-            "algorithm_id": ALGORITHM_ID,
+            "experiment_id": int(experiment_id),
+            "experiment_name": str(experiment_name),
+            "algorithm_id": str(algorithm_id),
+            "algorithm_label": str(algorithm_label),
+            "execution_backend": str(execution_backend),
             "seed": int(seed),
             "stop_reason": str(solver.stop_reason),
             "checkpoint_training_seconds": list(checkpoint_training_seconds),
@@ -285,11 +329,16 @@ def run_experiment(
             "current_rss_mib": (
                 psutil.Process().memory_info().rss / (1024.0 * 1024.0)
             ),
-            "reference_vm": dict(REFERENCE_VM),
+            "reference_vm": dict(reference_vm),
             "checkpoint_count": len(checkpoint_rows),
             "final_policy_checkpoint": str(final_checkpoint.resolve()),
             "final_policy_checkpoint_sha256": sha256_file(final_checkpoint),
             "final_checkpoint_nodes": int(final_payload["nodes_touched"]),
+        }
+        summary["execution_metrics"] = {
+            key: value
+            for key, value in raw_rows[-1].items()
+            if key.startswith("parallel_") or key.startswith("cumulative_parallel_")
         }
         summary["capacity_assessment"] = _capacity_assessment(summary)
         _write_json(run_dir / "summary.json", summary)
@@ -307,6 +356,10 @@ def run_experiment(
             },
         )
         raise
+    finally:
+        close = getattr(solver, "close", None)
+        if callable(close):
+            close()
 
 
 def _parse_args(argv=None):

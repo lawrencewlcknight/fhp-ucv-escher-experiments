@@ -75,6 +75,44 @@ game = load_fhp_game()
 policy = LoadedFHPPolicy(game, "outputs/RUN/final_policy_checkpoint.pkl")
 ```
 
+## exp2_fhp_ucv_escher_sequential and exp3_fhp_ucv_escher_ray_parallel
+
+Experiments 2 and 3 are a matched, single-seed comparison of sequential and
+synchronous Ray-parallel UCV-ESCHER. Both use seed 0, the exact Experiment 1
+algorithm configuration, the canonical OpenSpiel FHP game, and reloadable
+checkpoints at 6 and 12 effective training hours. Both stop after the 12-hour
+checkpoint. The only intended difference is the execution backend.
+
+Experiment 3 uses 12 persistent traversal actors, one authoritative learner,
+deterministic driver-side replay merging, and concurrent training of the three
+independent Q folds plus the calibration learner. The 10,000-trajectory phase is
+split into synchronized 1,200-trajectory dispatches so time checkpoints are
+observed at bounded safe merge boundaries without introducing asynchronous
+gradients. The implementation is ported from the Leduc repository; see
+[`unbiased_escher/PARALLEL_UPSTREAM.md`](unbiased_escher/PARALLEL_UPSTREAM.md).
+
+Local smoke tests:
+
+```bash
+python -m experiments.fhp.exp2_ucv_escher_sequential.run --smoke
+python -m experiments.fhp.exp3_ucv_escher_parallel.run --smoke
+```
+
+After both production outputs have been downloaded, validate that the arms are
+matched and generate their time-aligned throughput comparison:
+
+```bash
+python -m experiments.fhp.compare_exp2_exp3 \
+  --sequential-run outputs/RUN_FOR_EXP2 \
+  --parallel-run outputs/RUN_FOR_EXP3 \
+  --output-dir outputs/exp2_exp3_comparison
+```
+
+The comparison reports nodes, trajectories, outer iterations, policy-fit loss,
+and parallel-over-sequential node throughput at 6 and 12 hours. These are
+systems and training-progress measurements, not exact exploitability. Policy
+quality comparison should use sampled evaluation of the saved checkpoints.
+
 ## Google Cloud Batch
 
 The reference machine remains `n2-standard-8` with 8 vCPUs and 32 GB RAM.
@@ -88,6 +126,30 @@ JOB_NAME="exp1-fhp-escher-$(date -u +%Y%m%d-%H%M%S)"
   "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-8 50400 8000 32000 100
+```
+
+Experiments 2 and 3 use the same `c4-standard-32` VM allocation: 32 vCPUs,
+120,000 MiB requested task memory, and a 200 GiB boot disk. Submit them as two
+independent Batch jobs:
+
+```bash
+JOB_NAME="exp2-fhp-ucv-sequential-$(date -u +%Y%m%d-%H%M%S)"
+
+./gcp/submit_batch_experiment.sh \
+  "$JOB_NAME" \
+  "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
+    --output-root outputs/cloud/$JOB_NAME" \
+  c4-standard-32 50400 32000 120000 200
+```
+
+```bash
+JOB_NAME="exp3-fhp-ucv-parallel-$(date -u +%Y%m%d-%H%M%S)"
+
+./gcp/submit_batch_experiment.sh \
+  "$JOB_NAME" \
+  "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
+    --output-root outputs/cloud/$JOB_NAME" \
+  c4-standard-32 50400 32000 120000 200
 ```
 
 The 14-hour Batch allowance leaves time around the 12 hours of model training
@@ -109,5 +171,6 @@ python -m pytest
 python -m ruff check .
 ```
 
-See [`vr_deep_cfr/UPSTREAM.md`](vr_deep_cfr/UPSTREAM.md) for algorithm-code
-provenance and redistribution cautions.
+See [`vr_deep_cfr/UPSTREAM.md`](vr_deep_cfr/UPSTREAM.md) and
+[`unbiased_escher/PARALLEL_UPSTREAM.md`](unbiased_escher/PARALLEL_UPSTREAM.md)
+for algorithm-code provenance and redistribution cautions.

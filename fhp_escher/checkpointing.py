@@ -44,6 +44,12 @@ def save_policy_checkpoint(
         "type": CHECKPOINT_TYPE,
         "framework": "pytorch",
         "algorithm": "UCV-ESCHER",
+        "algorithm_id": str(checkpoint_row.get("algorithm_id", "ucv_escher")),
+        "execution_backend": str(
+            checkpoint_row.get("execution_backend", "sequential")
+        ),
+        "experiment_id": checkpoint_row.get("experiment_id"),
+        "experiment_name": checkpoint_row.get("experiment_name"),
         "game": serialisable_game_definition(),
         "seed": int(seed),
         "outer_iteration": int(solver.num_iteration),
