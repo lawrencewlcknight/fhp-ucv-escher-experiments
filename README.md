@@ -4,6 +4,16 @@ This repository studies Unbiased Control-Variate ESCHER (UCV-ESCHER) in
 two-player flop hold'em poker (FHP). It uses OpenSpiel for the complete game
 implementation and preserves the selected UCV-ESCHER training configuration.
 
+## Documentation
+
+- [`docs/GCP_BATCH_EXPERIMENTS.md`](docs/GCP_BATCH_EXPERIMENTS.md) — complete
+  Google Cloud setup, smoke/full submissions, monitoring, retrieval, and failure
+  diagnosis;
+- [`docs/OUTPUT_CONVENTIONS.md`](docs/OUTPUT_CONVENTIONS.md) — run directory,
+  checkpoint, comparison, evaluation, and diagnostic artifact contracts;
+- [`docs/THESIS_ARTIFACTS.md`](docs/THESIS_ARTIFACTS.md) — safe curation guidance
+  for future thesis-facing FHP results.
+
 ## Canonical game
 
 `fhp_escher.game.load_fhp_game()` loads OpenSpiel `universal_poker` with the

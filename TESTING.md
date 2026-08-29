@@ -16,4 +16,5 @@ partitioning, checkpoint reloadability, and absence of obsolete artifacts. Ray
 smoke tests require permission to inspect and start local worker processes.
 
 GCP Batch smoke-test and full-run commands for Experiments 1 through 4 are
-documented in the `Google Cloud Batch` section of `README.md`.
+documented in [`docs/GCP_BATCH_EXPERIMENTS.md`](docs/GCP_BATCH_EXPERIMENTS.md).
+The root README retains a quick-reference copy of the submission commands.
