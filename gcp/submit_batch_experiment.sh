@@ -27,7 +27,7 @@ CPU_MILLI="${5:-4000}"
 MEMORY_MIB="${6:-16000}"
 BOOT_DISK_SIZE_GB="${7:-100}"
 BOOT_DISK_TYPE="${8:-pd-balanced}"
-REPO_URL="${REPO_URL:-https://github.com/lawrencewlcknight/fhp-ucv-escher.git}"
+REPO_URL="${REPO_URL:-https://github.com/lawrencewlcknight/fhp-ucv-escher-experiments.git}"
 
 # C4-family VMs do not support Persistent Disk. Reject this known-invalid
 # allocation locally so Batch cannot spend its provisioning window retrying a
@@ -96,7 +96,7 @@ EXPERIMENT_COMMAND={experiment_command_literal}
 REPO_URL={repo_url_literal}
 
 WORKDIR=/workspace
-REPO_DIR="$WORKDIR/fhp-ucv-escher"
+REPO_DIR="$WORKDIR/fhp-ucv-escher-experiments"
 JOB_OUTPUT_DIR="$REPO_DIR/outputs/cloud/{job_name}"
 RUN_LOG="$JOB_OUTPUT_DIR/batch_run.log"
 RESOURCE_LOG="$JOB_OUTPUT_DIR/resource_snapshots.jsonl"

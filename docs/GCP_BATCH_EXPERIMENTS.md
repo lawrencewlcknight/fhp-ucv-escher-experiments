@@ -26,7 +26,7 @@ You need:
 The default repository URL is public HTTPS:
 
 ```text
-https://github.com/lawrencewlcknight/fhp-ucv-escher.git
+https://github.com/lawrencewlcknight/fhp-ucv-escher-experiments.git
 ```
 
 For a private fork, set `REPO_URL` to an authenticated clone URL or use a
