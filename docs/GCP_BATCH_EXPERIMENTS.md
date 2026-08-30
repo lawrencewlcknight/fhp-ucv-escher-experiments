@@ -1,4 +1,4 @@
-# Running the FHP ESCHER experiments on Google Cloud Batch
+# Running the FHP UCV-ESCHER experiments on Google Cloud Batch
 
 This guide covers the repeatable Google Cloud Batch workflow for the four
 flop hold'em poker (FHP) UCV-ESCHER experiments in this repository. Each Batch
@@ -6,6 +6,19 @@ job creates a temporary VM, clones the repository, installs an isolated Python
 3.11 environment, runs one experiment, uploads the complete `outputs/` tree to
 Cloud Storage, and exits. Batch owns the VM lifecycle; there is no persistent VM
 to shut down after a completed job.
+
+The end-to-end workflow is:
+
+1. configure and authenticate the Google Cloud CLI;
+2. enable the required APIs;
+3. create the results bucket and Batch service account;
+4. set the four required environment variables in the current terminal;
+5. validate the checked-in submission helper;
+6. submit the relevant smoke test and confirm it succeeds;
+7. submit the matching full experiment;
+8. monitor its status and job-scoped logs;
+9. download and verify the uploaded outputs;
+10. retain diagnostics and clean up completed Batch job records.
 
 The production runs are time-bound. They save reloadable policies at the first
 safe trajectory boundary after 6 and 12 effective training hours, then stop.
@@ -66,6 +79,12 @@ gcloud storage buckets create "$BUCKET" \
   --uniform-bucket-level-access
 ```
 
+Confirm that the bucket exists and is in the intended region:
+
+```bash
+gcloud storage buckets describe "$BUCKET"
+```
+
 Create a dedicated Batch service account:
 
 ```bash
@@ -107,6 +126,13 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/logging.viewer"
 ```
 
+Confirm that the service account exists:
+
+```bash
+gcloud iam service-accounts describe "$SA_EMAIL" \
+  --project="$PROJECT_ID"
+```
+
 ## 3. Environment for each terminal
 
 Set these values before submitting or inspecting jobs:
@@ -118,6 +144,17 @@ export BUCKET="gs://${PROJECT_ID}-fhp-escher-results"
 export SA_EMAIL="fhp-escher-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 
 gcloud config set project "$PROJECT_ID"
+```
+
+Check the active values before every submission. An empty or stale value can
+send a job or its outputs to the wrong project, region, bucket, or identity:
+
+```bash
+echo "$PROJECT_ID"
+echo "$REGION"
+echo "$BUCKET"
+echo "$SA_EMAIL"
+gcloud config get-value project
 ```
 
 ## 4. Submission helper
@@ -272,6 +309,19 @@ gcloud batch jobs list --location "$REGION"
 gcloud batch jobs describe "$JOB_NAME" --location "$REGION"
 ```
 
+The normal state progression is `QUEUED` → `SCHEDULED` → `RUNNING` →
+`SUCCEEDED`. Treat `FAILED` as requiring investigation before resubmission. A
+job that remains in `SCHEDULED` can be blocked by VM availability, quota, IAM,
+or an invalid allocation such as an incompatible machine and disk type.
+
+For a concise status view:
+
+```bash
+gcloud batch jobs describe "$JOB_NAME" \
+  --location "$REGION" \
+  --format="yaml(status.state,status.runDuration,status.statusEvents)"
+```
+
 Read only the task logs belonging to one Batch job:
 
 ```bash
@@ -330,3 +380,120 @@ Because output upload runs in the cleanup trap, inspect Cloud Storage even when
 the Batch job reports failure. A failure before the repository or output
 directory is created can still prevent artifact upload; in that case Cloud
 Logging is the primary source of evidence.
+
+## 11. Changing CPU, memory, disk, or VM type
+
+The final six submission-helper arguments control the Batch allocation:
+
+```text
+MACHINE_TYPE MAX_RUN_SECONDS CPU_MILLI MEMORY_MIB BOOT_DISK_SIZE_GB BOOT_DISK_TYPE
+```
+
+CPU is expressed in milli-vCPUs, so `32000` requests 32 vCPUs. Memory is MiB.
+The CPU and memory requests must fit the selected machine type.
+
+Keep the disk family compatible with the machine family:
+
+- N2 commands in this repository use `pd-balanced`;
+- C4 commands use `hyperdisk-balanced` because C4 does not support Persistent
+  Disk;
+- the helper rejects a C4-family machine combined with any `pd-*` disk before
+  contacting Batch.
+
+The production allocations in section 5 are part of the experiment contract.
+If you change them for exploratory capacity testing, use a distinct job name
+and record the changed allocation with the result. Do not present a modified
+allocation as a canonical Experiment 1-4 run.
+
+## 12. Choosing a VM size
+
+Use smoke-test and production diagnostics rather than guessing from model
+parameters alone. Review:
+
+- peak and current RSS in `summary.json`;
+- cgroup memory peak, limit, and OOM counters in
+  `resource_snapshots.jsonl` and `batch_diagnostics.json`;
+- CPU utilization, load average, and largest-process snapshots;
+- node throughput and learner/worker timings in checkpoint rows;
+- disk utilization at cleanup;
+- Ray object-store pressure for Experiments 3 and 4.
+
+Experiment 2 intentionally uses the same 32-vCPU production machine as
+Experiments 3 and 4 so the sequential/parallel comparison is not confounded by
+different hardware. Experiment 4 reserves capacity for 28 traversal actors,
+the driver, Ray services, result merging, and concurrent learners.
+
+## 13. Runtime limits and stopping
+
+`MAX_RUN_SECONDS` is the Batch task ceiling, not the solver's effective
+training timer. Canonical full runs use `50400` seconds (14 hours), while the
+solver saves at 6 and 12 effective training hours and stops after the second
+checkpoint. Setup, policy fitting, serialization, cleanup, and upload are
+outside effective training time but inside the Batch ceiling.
+
+Do not reduce the full-run Batch limit to 12 wall-clock hours: Batch could
+terminate the task before the final policy is serialized and uploaded. A Batch
+timeout is a failed run even if it produced a partial checkpoint.
+
+Smoke tests use a two-hour ceiling but normally finish quickly because
+`--smoke` replaces the production work and time thresholds with tiny values.
+
+## 14. Adding and running later experiments
+
+New experiments should retain the numbered naming convention:
+
+```text
+experiments/fhp/expN_descriptive_name/
+```
+
+Their runners should accept `--smoke` and `--output-root`, save reloadable
+checkpoints where applicable, and use an `expN-` Batch job prefix. Submit them
+through the same checked-in helper:
+
+```bash
+JOB_NAME="expN-fhp-description-smoke-$(date -u +%Y%m%d-%H%M%S)"
+
+./gcp/submit_batch_experiment.sh \
+  "$JOB_NAME" \
+  "python -m experiments.fhp.expN_descriptive_name.run \
+    --smoke --output-root outputs/cloud/$JOB_NAME" \
+  n2-standard-4 7200 4000 16000 100 pd-balanced
+```
+
+Add both smoke and full commands to this guide when the experiment is added.
+
+## 15. Cleanup
+
+Batch deletes the temporary VM after the job reaches a terminal state, so no
+persistent experiment VM needs to be stopped manually. After confirming that
+outputs and diagnostics are safely in Cloud Storage, remove an old Batch job
+record with:
+
+```bash
+gcloud batch jobs delete "$JOB_NAME" \
+  --location "$REGION"
+```
+
+List bucket contents before deleting any results:
+
+```bash
+gcloud storage ls --recursive "$BUCKET/$JOB_NAME/"
+```
+
+Keep at least the run manifest, both checkpoint manifests and policy files,
+summary, Batch status, detailed diagnostics, resource snapshots, and run log.
+Do not delete a failed job's evidence until its cause is understood.
+
+## 16. Dependency installation
+
+Each Batch VM starts clean. The checked-in helper installs system build tools
+and `uv`, keeps the Cloud SDK on Python 3.10, and creates an isolated Python
+3.11 FHP environment. It then installs the pinned packages in
+`requirements.txt`, including CPU-only PyTorch, OpenSpiel, Ray, NumPy, SciPy,
+and psutil, followed by an editable install of this repository.
+
+Dependency installation time is part of Batch wall-clock time and cost, but not
+effective solver training time. A dependency failure occurs before experiment
+outputs may exist, so use Cloud Logging when no `batch_run.log` was uploaded.
+The repository commit printed in the run log is the authoritative source
+version for reproducibility.

@@ -262,7 +262,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
 # Keep Google Cloud CLI on a runtime it supports. This is separate from the
-# ESCHER experiment environment below, which remains Python 3.9.
+# ESCHER experiment environment below, which uses Python 3.11.
 uv python install 3.10
 export CLOUDSDK_PYTHON="$(uv python find 3.10)"
 echo "Configured Cloud SDK Python:"
