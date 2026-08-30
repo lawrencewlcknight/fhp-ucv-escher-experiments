@@ -23,6 +23,7 @@ REFERENCE_VM = {
     "cpu_milli": 32_000,
     "memory_mib": 120_000,
     "boot_disk_gib": 200,
+    "boot_disk_type": "hyperdisk-balanced",
 }
 
 

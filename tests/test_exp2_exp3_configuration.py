@@ -22,6 +22,7 @@ def test_comparison_arms_are_time_config_and_machine_matched():
         "cpu_milli": 32_000,
         "memory_mib": 120_000,
         "boot_disk_gib": 200,
+        "boot_disk_type": "hyperdisk-balanced",
     }
     assert sequential.UCV_CONFIG == parallel.UCV_CONFIG == BEST_UCV_CONFIG
     assert sequential.UCV_CONFIG is not BEST_UCV_CONFIG

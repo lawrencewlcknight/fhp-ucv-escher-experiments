@@ -161,9 +161,11 @@ export SA_EMAIL="YOUR_BATCH_SERVICE_ACCOUNT"
 ```
 
 Every smoke job below uses `n2-standard-4`, a two-hour Batch limit, 4 vCPUs,
-16,000 MiB of requested memory, and a 100 GiB boot disk. The `--smoke` flag
-retains the production orchestration and checkpoint/reload path while reducing
-the replay sizes, traversal counts, learner steps, and checkpoint thresholds.
+16,000 MiB of requested memory, and a 100 GiB `pd-balanced` boot disk. The
+`--smoke` flag retains the production orchestration and checkpoint/reload path
+while reducing the replay sizes, traversal counts, learner steps, and checkpoint
+thresholds. C4 full runs explicitly use `hyperdisk-balanced`; the submission
+helper rejects C4/Persistent Disk combinations before contacting Batch.
 
 ### Experiment 1: exp1_fhp_ucv_escher_baseline
 
@@ -176,7 +178,7 @@ JOB_NAME="exp1-fhp-ucv-baseline-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 #### GCP Batch full run
@@ -192,7 +194,7 @@ JOB_NAME="exp1-fhp-ucv-baseline-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-8 50400 8000 32000 100
+  n2-standard-8 50400 8000 32000 100 pd-balanced
 ```
 
 ### Experiment 2: exp2_fhp_ucv_escher_sequential
@@ -206,13 +208,14 @@ JOB_NAME="exp2-fhp-ucv-sequential-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 #### GCP Batch full run
 
 The Experiment 2 full run uses `c4-standard-32`, 32 vCPUs, 120,000 MiB of
-requested memory, a 200 GiB boot disk, and a 14-hour Batch limit.
+requested memory, a 200 GiB `hyperdisk-balanced` boot disk, and a 14-hour Batch
+limit.
 
 ```bash
 JOB_NAME="exp2-fhp-ucv-sequential-full-$(date -u +%Y%m%d-%H%M%S)"
@@ -221,7 +224,7 @@ JOB_NAME="exp2-fhp-ucv-sequential-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 ### Experiment 3: exp3_fhp_ucv_escher_ray_parallel
@@ -235,14 +238,14 @@ JOB_NAME="exp3-fhp-ucv-parallel-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 #### GCP Batch full run
 
 The Experiment 3 full run uses the same production allocation as Experiment 2:
-`c4-standard-32`, 32 vCPUs, 120,000 MiB of requested memory, a 200 GiB boot
-disk, and a 14-hour Batch limit.
+`c4-standard-32`, 32 vCPUs, 120,000 MiB of requested memory, a 200 GiB
+`hyperdisk-balanced` boot disk, and a 14-hour Batch limit.
 
 ```bash
 JOB_NAME="exp3-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
@@ -251,7 +254,7 @@ JOB_NAME="exp3-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 ### Experiment 4: exp4_fhp_ucv_escher_cpu_optimized
@@ -265,14 +268,14 @@ JOB_NAME="exp4-fhp-ucv-cpu-optimized-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 #### GCP Batch full run
 
 Experiment 4 uses `c4-standard-32`, 32 vCPUs, 120,000 MiB of requested memory,
-an 8 GiB Ray object store within that allocation, a 200 GiB boot disk, and a
-14-hour Batch limit.
+an 8 GiB Ray object store within that allocation, a 200 GiB
+`hyperdisk-balanced` boot disk, and a 14-hour Batch limit.
 
 ```bash
 JOB_NAME="exp4-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
@@ -281,7 +284,7 @@ JOB_NAME="exp4-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 The cleanup trap uploads outputs from smoke and full runs even after a failed

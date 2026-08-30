@@ -11,7 +11,8 @@ export DEBIAN_FRONTEND=noninteractive
 #     MAX_RUN_SECONDS \
 #     CPU_MILLI \
 #     MEMORY_MIB \
-#     BOOT_DISK_SIZE_GB
+#     BOOT_DISK_SIZE_GB \
+#     BOOT_DISK_TYPE
 #
 # Examples:
 #   n2-standard-2: CPU_MILLI=2000 MEMORY_MIB=8000
@@ -25,7 +26,25 @@ MAX_RUN_SECONDS="${4:-50400}"
 CPU_MILLI="${5:-4000}"
 MEMORY_MIB="${6:-16000}"
 BOOT_DISK_SIZE_GB="${7:-100}"
+BOOT_DISK_TYPE="${8:-pd-balanced}"
 REPO_URL="${REPO_URL:-https://github.com/lawrencewlcknight/fhp-poker-escher-architecture-experiments.git}"
+
+# C4-family VMs do not support Persistent Disk. Reject this known-invalid
+# allocation locally so Batch cannot spend its provisioning window retrying a
+# VM that can never start.
+case "$MACHINE_TYPE" in
+  c4-*|c4a-*|c4d-*|c4n-*)
+    case "$BOOT_DISK_TYPE" in
+      pd-*)
+        echo \
+          "ERROR: ${MACHINE_TYPE} does not support Persistent Disk type ${BOOT_DISK_TYPE}." \
+          >&2
+        echo "Use hyperdisk-balanced for C4-family Batch jobs." >&2
+        exit 2
+        ;;
+    esac
+    ;;
+esac
 
 : "${PROJECT_ID:?Set PROJECT_ID first}"
 : "${REGION:?Set REGION first}"
@@ -41,6 +60,7 @@ export MAX_RUN_SECONDS
 export CPU_MILLI
 export MEMORY_MIB
 export BOOT_DISK_SIZE_GB
+export BOOT_DISK_TYPE
 export BUCKET
 export SA_EMAIL
 export JOB_JSON
@@ -60,6 +80,7 @@ max_run_seconds = os.environ["MAX_RUN_SECONDS"]
 cpu_milli = int(os.environ["CPU_MILLI"])
 memory_mib = int(os.environ["MEMORY_MIB"])
 boot_disk_size_gb = int(os.environ["BOOT_DISK_SIZE_GB"])
+boot_disk_type = os.environ["BOOT_DISK_TYPE"]
 bucket = os.environ["BUCKET"]
 service_account = os.environ["SA_EMAIL"]
 repo_url_literal = shlex.quote(os.environ["REPO_URL"])
@@ -93,6 +114,7 @@ echo "Experiment command: $EXPERIMENT_COMMAND"
 echo "Requested CPU milli: {cpu_milli}"
 echo "Requested memory MiB: {memory_mib}"
 echo "Requested boot disk GiB: {boot_disk_size_gb}"
+echo "Requested boot disk type: {boot_disk_type}"
 
 cleanup() {{
   local exit_code="$?"
@@ -311,7 +333,7 @@ job = {
                     "provisioningModel": "STANDARD",
                     "bootDisk": {
                         "sizeGb": boot_disk_size_gb,
-                        "type": "pd-balanced",
+                        "type": boot_disk_type,
                     },
                 }
             }
@@ -332,6 +354,7 @@ echo "Max run duration: ${MAX_RUN_SECONDS}s"
 echo "CPU milli: ${CPU_MILLI}"
 echo "Memory MiB: ${MEMORY_MIB}"
 echo "Boot disk GiB: ${BOOT_DISK_SIZE_GB}"
+echo "Boot disk type: ${BOOT_DISK_TYPE}"
 echo "Job config: ${JOB_JSON}"
 
 echo

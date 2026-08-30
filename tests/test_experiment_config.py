@@ -25,6 +25,7 @@ def test_experiment_1_budget_and_reference_vm():
         "cpu_milli": 8_000,
         "memory_mib": 32_000,
         "boot_disk_gib": 100,
+        "boot_disk_type": "pd-balanced",
     }
 
 

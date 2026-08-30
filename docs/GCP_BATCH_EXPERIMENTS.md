@@ -126,7 +126,7 @@ Run all jobs through `gcp/submit_batch_experiment.sh`. Its positional interface
 is:
 
 ```text
-JOB_NAME EXPERIMENT_COMMAND MACHINE_TYPE MAX_RUN_SECONDS CPU_MILLI MEMORY_MIB BOOT_DISK_SIZE_GB
+JOB_NAME EXPERIMENT_COMMAND MACHINE_TYPE MAX_RUN_SECONDS CPU_MILLI MEMORY_MIB BOOT_DISK_SIZE_GB BOOT_DISK_TYPE
 ```
 
 Before first use, check the scripts:
@@ -137,6 +137,11 @@ bash -n gcp/submit_batch_experiment.sh
 bash -n gcp/read_batch_task_logs.sh
 ```
 
+`BOOT_DISK_TYPE` defaults to `pd-balanced` for backward-compatible N2 use. Pass
+it explicitly in maintained commands. The helper rejects a C4-family machine
+paired with any `pd-*` Persistent Disk locally, before generating or submitting
+a Batch job.
+
 The submission helper deliberately sets `maxRetryCount` to zero so a failed
 training run is not silently repeated. It captures stdout and stderr, records
 15-second resource snapshots, classifies failures, and uploads outputs from an
@@ -146,15 +151,15 @@ exit trap on both success and failure.
 
 | Experiment | Backend | Full-run VM | CPU request | Memory request | Boot disk |
 |---|---|---:|---:|---:|---:|
-| 1 | Sequential baseline | `n2-standard-8` | 8,000 milli | 32,000 MiB | 100 GiB |
-| 2 | Sequential comparison | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB |
-| 3 | Ray parallel comparison | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB |
-| 4 | CPU-optimized Ray parallel | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB |
+| 1 | Sequential baseline | `n2-standard-8` | 8,000 milli | 32,000 MiB | 100 GiB `pd-balanced` |
+| 2 | Sequential comparison | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB `hyperdisk-balanced` |
+| 3 | Ray parallel comparison | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB `hyperdisk-balanced` |
+| 4 | CPU-optimized Ray parallel | `c4-standard-32` | 32,000 milli | 120,000 MiB | 200 GiB `hyperdisk-balanced` |
 
 All smoke tests use `n2-standard-4`, 4,000 CPU milli, 16,000 MiB of memory, a
-100 GiB disk, and a two-hour Batch ceiling. `--smoke` retains the production
-orchestration and checkpoint/reload path while shrinking training work and
-checkpoint thresholds.
+100 GiB `pd-balanced` disk, and a two-hour Batch ceiling. `--smoke` retains the
+production orchestration and checkpoint/reload path while shrinking training
+work and checkpoint thresholds.
 
 ## 6. Submit smoke tests
 
@@ -169,7 +174,7 @@ JOB_NAME="exp1-fhp-ucv-baseline-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 ### Experiment 2
@@ -181,7 +186,7 @@ JOB_NAME="exp2-fhp-ucv-sequential-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 ### Experiment 3
@@ -193,7 +198,7 @@ JOB_NAME="exp3-fhp-ucv-parallel-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 ### Experiment 4
@@ -205,7 +210,7 @@ JOB_NAME="exp4-fhp-ucv-cpu-optimized-smoke-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-4 7200 4000 16000 100
+  n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 ## 7. Submit full runs
@@ -219,7 +224,7 @@ JOB_NAME="exp1-fhp-ucv-baseline-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  n2-standard-8 50400 8000 32000 100
+  n2-standard-8 50400 8000 32000 100 pd-balanced
 ```
 
 ### Experiment 2
@@ -231,7 +236,7 @@ JOB_NAME="exp2-fhp-ucv-sequential-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 ### Experiment 3
@@ -243,7 +248,7 @@ JOB_NAME="exp3-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 ### Experiment 4
@@ -255,7 +260,7 @@ JOB_NAME="exp4-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
   "$JOB_NAME" \
   "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
     --output-root outputs/cloud/$JOB_NAME" \
-  c4-standard-32 50400 32000 120000 200
+  c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
 ## 8. Monitor a job and inspect logs
