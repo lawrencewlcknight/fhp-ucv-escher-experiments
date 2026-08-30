@@ -1,4 +1,4 @@
-# FHP ESCHER Architecture Experiments
+# FHP UCV-ESCHER
 
 This repository studies Unbiased Control-Variate ESCHER (UCV-ESCHER) in
 two-player flop hold'em poker (FHP). It uses OpenSpiel for the complete game

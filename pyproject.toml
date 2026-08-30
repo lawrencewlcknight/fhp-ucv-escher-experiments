@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fhp-poker-escher-architecture-experiments"
+name = "fhp-ucv-escher"
 version = "0.1.0"
-description = "UCV-ESCHER architecture experiments for flop hold'em poker"
+description = "UCV-ESCHER experiments for flop hold'em poker"
 requires-python = ">=3.10,<3.13"
 
 [tool.setuptools.packages.find]

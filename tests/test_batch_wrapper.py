@@ -51,6 +51,8 @@ def test_generated_batch_script_has_valid_shell_and_diagnostics(tmp_path, monkey
     assert "--cloud-log-every 4" in generated
     assert "batch_diagnostics.json" in generated
     assert "--experiment-exit-code" in generated
+    assert 'REPO_DIR="$WORKDIR/fhp-ucv-escher"' in generated
+    assert "fhp-poker-escher-architecture-experiments" not in submit_script
     assert job["allocationPolicy"]["instances"][0]["policy"]["bootDisk"] == {
         "sizeGb": 100,
         "type": "pd-balanced",
