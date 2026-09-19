@@ -38,14 +38,24 @@ def _write_csv(path: Path, rows) -> None:
         writer.writerows(rows)
 
 
-def task_name(index: int, seed: int) -> str:
-    return f"task_{index:03d}_{ALGORITHM_ID}_seed_{seed}"
+def task_name(
+    index: int,
+    seed: int,
+    *,
+    algorithm_id: str = ALGORITHM_ID,
+) -> str:
+    return f"task_{index:03d}_{algorithm_id}_seed_{seed}"
 
 
 def aggregate_workers(
     output_root: Path,
     *,
     seeds: Sequence[int] = PRODUCTION_SEEDS,
+    experiment_id: int = EXPERIMENT_ID,
+    experiment_name: str = EXPERIMENT_NAME,
+    algorithm_id: str = ALGORITHM_ID,
+    contract_manifest_fn=contract_manifest,
+    experiment_label: str = "Experiment 2",
 ) -> Path:
     output_root = Path(output_root).resolve()
     workers_root = output_root / "workers"
@@ -55,12 +65,16 @@ def aggregate_workers(
     checkpoints = []
     worker_artifacts = []
     for index, seed in enumerate(seeds):
-        worker_dir = workers_root / task_name(index, int(seed))
+        worker_dir = workers_root / task_name(
+            index, int(seed), algorithm_id=algorithm_id
+        )
         success_path = worker_dir / "SUCCESS.json"
         summary_path = worker_dir / "summary.json"
         manifest_path = worker_dir / "checkpoint_manifest.json"
         if not success_path.is_file() or not summary_path.is_file() or not manifest_path.is_file():
-            raise FileNotFoundError(f"Incomplete Experiment 2 worker: {worker_dir}")
+            raise FileNotFoundError(
+                f"Incomplete {experiment_label} worker: {worker_dir}"
+            )
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         rows = json.loads(manifest_path.read_text(encoding="utf-8"))
         if (
@@ -97,11 +111,11 @@ def aggregate_workers(
         {
             "schema_version": 1,
             "status": "complete",
-            "experiment_id": EXPERIMENT_ID,
-            "experiment_name": EXPERIMENT_NAME,
-            "algorithm_id": ALGORITHM_ID,
+            "experiment_id": experiment_id,
+            "experiment_name": experiment_name,
+            "algorithm_id": algorithm_id,
             "completed_utc": datetime.now(timezone.utc).isoformat(),
-            "contract": contract_manifest(),
+            "contract": contract_manifest_fn(),
             "workers": worker_artifacts,
             "artifacts": {
                 "seed_summaries": "seed_summaries.csv",

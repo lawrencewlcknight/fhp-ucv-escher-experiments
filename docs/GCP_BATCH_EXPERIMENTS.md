@@ -9,7 +9,7 @@ to shut down after a completed job.
 
 The four original experiments are archived. Their instructions are retained for
 exact historical reproduction; every maintained legacy module and job name
-includes `archived` to distinguish a rerun from active Experiments 1 and 2.
+includes `archived` to distinguish a rerun from active Experiments 1, 2, and 3.
 
 The end-to-end workflow is:
 
@@ -115,6 +115,47 @@ Monitor or resume a submitted run with the original `RUN_ID` and `REPO_REF`:
 Downloaded artifacts use the same layout as Experiment 1 beneath
 `$BUCKET/$RUN_ID/`. The complete representation and evaluation contract is in
 [`experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md`](../experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md).
+
+## Active Experiment 3: wider lossless structured networks
+
+Experiment 3 changes only Experiment 2's network widths. It retains the same
+three-seed task array, one VM per seed, cloud-smoke gate, retry/resume behavior,
+24 effective training hours, 6/12/18/24-hour checkpoints, aggregation, and
+diagnostics. Each production seed still uses an on-demand `n2-standard-8` VM so
+the comparison measures learning per equal wall-clock and hardware budget.
+
+Test the complete worker locally:
+
+```bash
+./gcp/run_exp3_wider_structured.sh smoke-local
+```
+
+Push the tested commit and submit the controller:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp3-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+
+./gcp/run_exp3_wider_structured.sh run
+```
+
+To run only the GCP smoke job:
+
+```bash
+./gcp/run_exp3_wider_structured.sh smoke-cloud
+```
+
+Monitor or resume with the original `RUN_ID` and `REPO_REF`:
+
+```bash
+./gcp/run_exp3_wider_structured.sh status
+./gcp/run_exp3_wider_structured.sh resume
+```
+
+Artifacts are written beneath `$BUCKET/$RUN_ID/` using the same layout as
+Experiment 2. The frozen capacity comparison is documented in
+[`experiments/fhp/exp3_fhp_wider_lossless_structured_ucv/README.md`](../experiments/fhp/exp3_fhp_wider_lossless_structured_ucv/README.md).
 
 ## 1. Prerequisites
 

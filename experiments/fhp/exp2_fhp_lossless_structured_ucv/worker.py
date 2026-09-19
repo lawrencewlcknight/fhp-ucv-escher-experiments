@@ -147,17 +147,28 @@ def _make_solver(seed: int, config: Mapping):
     return solver
 
 
-def _state_paths(worker_dir: Path, schedule: Sequence[Mapping], seed: int):
+def _state_paths(
+    worker_dir: Path,
+    schedule: Sequence[Mapping],
+    seed: int,
+    *,
+    algorithm_id: str = ALGORITHM_ID,
+):
     return [
         worker_dir
         / "training_states"
-        / f"{ALGORITHM_ID}_seed_{seed}_{row['checkpoint_id']}.pt"
+        / f"{algorithm_id}_seed_{seed}_{row['checkpoint_id']}.pt"
         for row in reversed(schedule)
     ]
 
 
-def _sync_remote(worker_dir: Path) -> None:
-    remote = os.environ.get("EXP2_REMOTE_TASK_URI")
+def _sync_remote(
+    worker_dir: Path,
+    *,
+    remote_task_env: str = "EXP2_REMOTE_TASK_URI",
+    experiment_label: str = "Experiment 2",
+) -> None:
+    remote = os.environ.get(remote_task_env)
     if not remote:
         return
     if (
@@ -165,7 +176,7 @@ def _sync_remote(worker_dir: Path) -> None:
         or remote != remote.strip()
         or any(ord(character) < 32 for character in remote)
     ):
-        raise ValueError(f"Invalid Experiment 2 remote task URI: {remote!r}")
+        raise ValueError(f"Invalid {experiment_label} remote task URI: {remote!r}")
     command = [
         "gcloud",
         "storage",
@@ -202,12 +213,17 @@ def _restore_latest(
     seed: int,
     commit: str,
     config: Mapping,
+    algorithm_id: str = ALGORITHM_ID,
+    read_training_state_fn=read_training_state,
+    restore_training_state_fn=restore_training_state,
 ) -> list[dict]:
     manifest_rows = []
     manifest_path = worker_dir / "checkpoint_manifest.json"
     if manifest_path.is_file():
         manifest_rows = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for path in _state_paths(worker_dir, schedule, seed):
+    for path in _state_paths(
+        worker_dir, schedule, seed, algorithm_id=algorithm_id
+    ):
         if not path.is_file():
             continue
         recorded = next(
@@ -224,11 +240,11 @@ def _restore_latest(
             LOGGER.warning("Skipping corrupt continuation state: %s", path)
             continue
         try:
-            payload = read_training_state(path)
+            payload = read_training_state_fn(path)
         except (EOFError, OSError, RuntimeError, pickle.UnpicklingError):
             LOGGER.exception("Skipping unreadable continuation state: %s", path)
             continue
-        captured = restore_training_state(
+        captured = restore_training_state_fn(
             solver,
             payload,
             seed=seed,
@@ -240,7 +256,7 @@ def _restore_latest(
             if not checkpoint.is_file() or sha256_file(checkpoint) != record["sha256"]:
                 raise ValueError(f"Restored policy checkpoint is missing or corrupt: {checkpoint}")
             state_path = worker_dir / "training_states" / (
-                f"{ALGORITHM_ID}_seed_{seed}_{record['checkpoint_id']}.pt"
+                f"{algorithm_id}_seed_{seed}_{record['checkpoint_id']}.pt"
             )
             if state_path.is_file():
                 record["training_state_path"] = str(state_path.relative_to(worker_dir))
@@ -282,11 +298,25 @@ def run_worker(
     config: Mapping,
     smoke: bool,
     resume: bool,
+    experiment_id: int = EXPERIMENT_ID,
+    experiment_name: str = EXPERIMENT_NAME,
+    algorithm_id: str = ALGORITHM_ID,
+    algorithm_label: str = ALGORITHM_LABEL,
+    production_seeds: Sequence[int] = PRODUCTION_SEEDS,
+    smoke_seeds: Sequence[int] = SMOKE_SEEDS,
+    reference_vm: Mapping = REFERENCE_VM,
+    contract_validator=validate_contract,
+    training_state_builder=build_training_state,
+    training_state_reader=read_training_state,
+    training_state_restorer=restore_training_state,
+    training_state_saver=save_training_state,
+    remote_task_env: str = "EXP2_REMOTE_TASK_URI",
+    experiment_label: str = "Experiment 2",
 ) -> dict:
     worker_dir = Path(worker_dir).resolve()
     worker_dir.mkdir(parents=True, exist_ok=True)
-    contract_seeds = SMOKE_SEEDS if smoke else PRODUCTION_SEEDS
-    validate_contract(
+    contract_seeds = smoke_seeds if smoke else production_seeds
+    contract_validator(
         seeds=contract_seeds, schedule=schedule, config=config, smoke=smoke
     )
     if int(seed) not in contract_seeds:
@@ -295,10 +325,10 @@ def run_worker(
     started = datetime.now(timezone.utc)
     manifest = {
         "schema_version": 1,
-        "experiment_id": EXPERIMENT_ID,
-        "experiment_name": EXPERIMENT_NAME,
-        "algorithm_id": ALGORITHM_ID,
-        "algorithm_label": ALGORITHM_LABEL,
+        "experiment_id": experiment_id,
+        "experiment_name": experiment_name,
+        "algorithm_id": algorithm_id,
+        "algorithm_label": algorithm_label,
         "execution_backend": "sequential_seed_worker",
         "seed": int(seed),
         "smoke": bool(smoke),
@@ -313,7 +343,7 @@ def run_worker(
         "feature_encoder": StructuredFHPGroupedWideUCVEscher.__name__,
         "training_config": dict(config),
         "training_config_sha256": _config_sha256(config),
-        "reference_vm": dict(REFERENCE_VM),
+        "reference_vm": dict(reference_vm),
         "repository_commit": commit,
         "started_utc": started.isoformat(),
     }
@@ -337,6 +367,9 @@ def run_worker(
             seed=seed,
             commit=commit,
             config=config,
+            algorithm_id=algorithm_id,
+            read_training_state_fn=training_state_reader,
+            restore_training_state_fn=training_state_restorer,
         )
         if resume
         else []
@@ -361,12 +394,12 @@ def run_worker(
         checkpoints_dir = worker_dir / "checkpoints"
         checkpoints_dir.mkdir(parents=True, exist_ok=True)
         checkpoint_path = checkpoints_dir / (
-            f"{ALGORITHM_ID}_seed_{seed}_{checkpoint_id}.pkl"
+            f"{algorithm_id}_seed_{seed}_{checkpoint_id}.pkl"
         )
         raw_checkpoint.update(
-            experiment_id=EXPERIMENT_ID,
-            experiment_name=EXPERIMENT_NAME,
-            algorithm_id=ALGORITHM_ID,
+            experiment_id=experiment_id,
+            experiment_name=experiment_name,
+            algorithm_id=algorithm_id,
             execution_backend="sequential_seed_worker",
         )
         save_policy_checkpoint(
@@ -378,7 +411,9 @@ def run_worker(
         )
         payload = load_checkpoint_payload(checkpoint_path)
         if payload.get("feature_encoder") != active_solver.feature_encoder.metadata():
-            raise RuntimeError("Saved policy omitted the Experiment 2 encoder contract")
+            raise RuntimeError(
+                f"Saved policy omitted the {experiment_label} encoder contract"
+            )
         record = {
             "checkpoint_index": len(captured),
             "checkpoint_id": checkpoint_id,
@@ -402,10 +437,10 @@ def run_worker(
         ]
         _write_incremental_manifests(worker_dir, ordered)
         state_path = worker_dir / "training_states" / (
-            f"{ALGORITHM_ID}_seed_{seed}_{checkpoint_id}.pt"
+            f"{algorithm_id}_seed_{seed}_{checkpoint_id}.pt"
         )
         record["training_state_path"] = str(state_path.relative_to(worker_dir))
-        state_payload = build_training_state(
+        state_payload = training_state_builder(
             active_solver,
             seed=seed,
             checkpoint_id=checkpoint_id,
@@ -413,12 +448,16 @@ def run_worker(
             config=config,
             captured_checkpoints=ordered,
         )
-        save_training_state(state_path, state_payload)
+        training_state_saver(state_path, state_payload)
         del state_payload
         record["training_state_sha256"] = sha256_file(state_path)
         record["training_state_size_bytes"] = int(state_path.stat().st_size)
         _write_incremental_manifests(worker_dir, ordered)
-        _sync_remote(worker_dir)
+        _sync_remote(
+            worker_dir,
+            remote_task_env=remote_task_env,
+            experiment_label=experiment_label,
+        )
 
     try:
         checkpoint_rows = (
@@ -430,7 +469,9 @@ def run_worker(
             solver.stop_reason = "training_time_budget"
         ordered = [captured[str(row["checkpoint_id"])] for row in schedule]
         if len(ordered) != 4 or solver.stop_reason != "training_time_budget":
-            raise RuntimeError("Experiment 2 did not complete all four checkpoints")
+            raise RuntimeError(
+                f"{experiment_label} did not complete all four checkpoints"
+            )
         _write_csv(worker_dir / "checkpoint_rows.csv", checkpoint_rows)
         _write_incremental_manifests(worker_dir, ordered)
         final_checkpoint = worker_dir / ordered[-1]["path"]
@@ -441,9 +482,9 @@ def run_worker(
         summary = {
             "schema_version": 1,
             "status": "complete",
-            "experiment_id": EXPERIMENT_ID,
-            "experiment_name": EXPERIMENT_NAME,
-            "algorithm_id": ALGORITHM_ID,
+            "experiment_id": experiment_id,
+            "experiment_name": experiment_name,
+            "algorithm_id": algorithm_id,
             "seed": int(seed),
             "smoke": bool(smoke),
             "stop_reason": solver.stop_reason,
@@ -459,7 +500,7 @@ def run_worker(
             ),
             "feature_encoder": solver.feature_encoder.metadata(),
             "peak_rss_mib": _peak_rss_mib(),
-            "reference_vm": dict(REFERENCE_VM),
+            "reference_vm": dict(reference_vm),
             "final_policy_path": final_policy.name,
             "final_policy_sha256": sha256_file(final_policy),
             "resumed_from_training_state": bool(
@@ -478,7 +519,11 @@ def run_worker(
                 "summary_sha256": sha256_file(worker_dir / "summary.json"),
             },
         )
-        _sync_remote(worker_dir)
+        _sync_remote(
+            worker_dir,
+            remote_task_env=remote_task_env,
+            experiment_label=experiment_label,
+        )
         return summary
     except BaseException as exc:
         _write_json(
@@ -498,7 +543,11 @@ def run_worker(
             },
         )
         try:
-            _sync_remote(worker_dir)
+            _sync_remote(
+                worker_dir,
+                remote_task_env=remote_task_env,
+                experiment_label=experiment_label,
+            )
         except BaseException:
             LOGGER.exception("Failure artifact upload also failed")
         raise

@@ -9,6 +9,7 @@ Run the unit suite and the end-to-end one-iteration smoke test with:
 python -m pytest
 ./gcp/run_exp1_grouped_wide.sh smoke-local
 ./gcp/run_exp2_lossless_structured.sh smoke-local
+./gcp/run_exp3_wider_structured.sh smoke-local
 python -m experiments.fhp.exp1_archived_ucv_escher_baseline.run --smoke
 python -m experiments.fhp.exp2_archived_ucv_escher_sequential.run --smoke
 python -m experiments.fhp.exp3_archived_ucv_escher_parallel.run --smoke
@@ -25,6 +26,11 @@ feature dimensions, exact betting-history separation, structured network and
 float32 replay construction, GCP task-array generation, and encoder-aware
 checkpoint reloadability.
 
-GCP Batch smoke-test and full-run commands for Experiments 1 through 4 are
-documented in [`docs/GCP_BATCH_EXPERIMENTS.md`](docs/GCP_BATCH_EXPERIMENTS.md).
-The root README retains a quick-reference copy of the submission commands.
+The active Experiment 3 tests freeze the network-width-only comparison, verify
+the 1.97x online parameter count, inspect generated three-VM Batch jobs, and
+exercise all four checkpoints plus exact continuation-state restore.
+
+GCP Batch smoke-test and full-run commands for active Experiments 1 through 3
+and archived Experiments 1 through 4 are documented in
+[`docs/GCP_BATCH_EXPERIMENTS.md`](docs/GCP_BATCH_EXPERIMENTS.md). The root
+README retains a quick-reference copy of the active submission commands.

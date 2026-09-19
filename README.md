@@ -54,14 +54,34 @@ export RUN_ID="exp2-fhp-$(date -u '+%Y%m%d-%H%M%S')"
 
 See the [Experiment 2 protocol](experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md).
 
+## Active Experiment 3: wider structured FHP networks
+
+`exp3_fhp_wider_lossless_structured_ucv` is a controlled network-capacity test
+based on Experiment 2. It increases card/context branches from 64 to 96 units,
+regret/critic/calibration trunks from two 128-unit layers to two 192-unit
+layers, and the average-policy trunk from two 192-unit layers to two 256-unit
+layers. All other algorithm, representation, runtime, seed, hardware, and
+checkpoint settings are unchanged. Online trainable capacity increases from
+310,993 to 611,729 parameters (1.97x).
+
+```bash
+./gcp/run_exp3_wider_structured.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp3-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp3_wider_structured.sh run
+```
+
+See the [Experiment 3 protocol](experiments/fhp/exp3_fhp_wider_lossless_structured_ucv/README.md).
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated through the sibling `fhp-evaluation-suite`, with
 checkpoint reconstruction supplied by `fhp_escher.evaluation_adapter`. Install
 the suite from this directory with
 `python -m pip install -e ../../fhp-evaluation-suite`. Raw-OpenSpiel checkpoints
-can also use its `fhp-evaluate` CLI directly. Experiment 2 checkpoints must use
-this repository's encoder-aware evaluator shown below.
+can also use its `fhp-evaluate` CLI directly. Experiment 2 and Experiment 3
+checkpoints must use this repository's encoder-aware evaluators shown below.
 
 The benchmark uses both-seat duplicate deals and corrected LooseAggressive
 bands `(-300,-100)`. LBR is reported as a lower bound, not exact exploitability.
@@ -88,10 +108,14 @@ python -m experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.evaluate_checkpoint
   --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
 ```
 
-Experiment 2 uses the same evaluation schedule with its encoder-aware loader:
+Experiments 2 and 3 use the same evaluation schedule with the encoder-aware
+loader:
 
 ```bash
 python -m experiments.fhp.exp2_fhp_lossless_structured_ucv.evaluate_checkpoints \
+  --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
+
+python -m experiments.fhp.exp3_fhp_wider_lossless_structured_ucv.evaluate_checkpoints \
   --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
 ```
 

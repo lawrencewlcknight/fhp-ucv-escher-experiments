@@ -71,6 +71,19 @@ layout, or checkpoint weights disagree.
 Experiment 2 continuation states also retain the independent float32 replay
 sampler states, so a retried Batch task resumes the same sampling streams.
 
+## Active Experiment 3 outputs
+
+`exp3_fhp_wider_lossless_structured_ucv` uses the same three-worker,
+four-checkpoint, encoder-aware output contract as Experiment 2. Its manifests
+identify the wider 96-unit card/context branches, two 192-unit layers in each
+regret/critic/calibration trunk, and two 256-unit average-policy layers. Model
+metadata in every policy checkpoint is sufficient for the shared loader to
+reconstruct those widths exactly.
+
+Experiment 3 uses its own continuation-state type and
+`wider_lossless_structured_ucv_escher` artifact prefix. This prevents an
+Experiment 2 continuation state from being mistaken for an Experiment 3 state.
+
 ## Reloadable policy contract
 
 Checkpoint files contain the fitted average-policy state and metadata required
