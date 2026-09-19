@@ -66,7 +66,9 @@ def save_policy_checkpoint(
         "training_config": dict(config),
         "input_size": int(solver.infostate_size),
         "num_actions": int(solver.action_size),
-        "policy_network_layers": list(solver.network_layers),
+        "policy_network_layers": list(
+            getattr(solver, "average_policy_network_layers", solver.network_layers)
+        ),
         "policy_state_dict": state_dict,
     }
     path = Path(path)

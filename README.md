@@ -1,9 +1,39 @@
 # FHP UCV-ESCHER Experiments
 
-> **Archive status:** Experiments 1–4 are retained as runnable historical
+> **Archive status:** The former Experiments 1–4 are retained as runnable historical
 > references. Their package names, run identities, checkpoint prefixes, and GCP
 > job names contain `archived`. New research experiments should reuse useful
 > components without modifying these archived definitions.
+
+## Active Experiment 1: grouped-wide FHP baseline
+
+The active baseline is `exp1_fhp_grouped_wide_ucv_baseline`. It ports the best
+training configuration from Leduc ESCHER architecture Experiment 35 to the
+canonical OpenSpiel FHP game. Seeds `0`, `1`, and `2` run concurrently on three
+independent GCP Batch VMs for 24 effective training hours each.
+
+Every seed saves a reloadable policy and exact continuation state at the first
+completed outer iteration after 6, 12, 18, and 24 hours. The remote controller
+requires a successful cloud smoke before production, permits one automatic
+retry per worker, resumes from durable Cloud Storage state, aggregates only
+after all seeds succeed, and records independent resource/OOM diagnostics.
+
+Local smoke:
+
+```bash
+./gcp/run_exp1_grouped_wide.sh smoke-local
+```
+
+Full GCP submission after exporting the variables documented in
+[`docs/GCP_BATCH_EXPERIMENTS.md`](docs/GCP_BATCH_EXPERIMENTS.md):
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp1-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp1_grouped_wide.sh run
+```
+
+See the [complete experiment protocol](experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md).
 
 ## Shared policy evaluation
 
@@ -17,8 +47,9 @@ through an algorithm-specific copy. The adapter is
 The benchmark uses both-seat duplicate deals and corrected LooseAggressive
 bands `(-300,-100)`. LBR is reported as a lower bound, not exact exploitability.
 
-Any experiment run's verified 6-hour and 12-hour checkpoints can be evaluated
-together, with common random numbers and paired temporal intervals, using:
+An archived experiment run's verified 6-hour and 12-hour checkpoints can be
+evaluated together, with common random numbers and paired temporal intervals,
+using:
 
 ```bash
 python -m experiments.fhp.evaluate_checkpoints \
@@ -29,6 +60,14 @@ The production defaults are 10,000 duplicate pairs per rule agent and
 checkpoint, 1,000 LBR pairs with 4,096 pre-flop rollouts, and 50,000 direct
 checkpoint cross-play pairs. Results are written beneath
 `outputs/evaluation/EXPERIMENT_NAME/RUN_DIRECTORY/`.
+
+The active Experiment 1 evaluator verifies and evaluates all four six-hourly
+checkpoints for one seed worker:
+
+```bash
+python -m experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.evaluate_checkpoints \
+  --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
+```
 
 After archived Experiments 1--4 have been evaluated with the same configuration,
 build the common-deal 6-hour and 12-hour cross-play matrices with:

@@ -7,6 +7,7 @@ Run the unit suite and the end-to-end one-iteration smoke test with:
 
 ```bash
 python -m pytest
+./gcp/run_exp1_grouped_wide.sh smoke-local
 python -m experiments.fhp.exp1_archived_ucv_escher_baseline.run --smoke
 python -m experiments.fhp.exp2_archived_ucv_escher_sequential.run --smoke
 python -m experiments.fhp.exp3_archived_ucv_escher_parallel.run --smoke

@@ -1,3 +1,4 @@
+from copy import deepcopy
 import math
 import random
 import time
@@ -112,6 +113,9 @@ class DeepCumuAdv:
         self._checkpoint_overhead_seconds = 0.0
         self._active_checkpoint_started_at = None
         self._stop_requested = False
+        self._resume_training_elapsed_seconds = 0.0
+        self._resume_completed_checkpoint_count = 0
+        self._checkpoint_resume_rng_state = None
         set_seed(seed)
         self.init_ave_policy_trainer()
         self.init_regret_trainers()
@@ -226,7 +230,11 @@ class DeepCumuAdv:
 
     def _training_elapsed_seconds(self):
         """Elapsed solver time excluding policy-checkpoint fitting and writes."""
-        elapsed = self._wall_clock_seconds() - self._checkpoint_overhead_seconds
+        elapsed = (
+            self._resume_training_elapsed_seconds
+            + self._wall_clock_seconds()
+            - self._checkpoint_overhead_seconds
+        )
         if self._active_checkpoint_started_at is not None:
             elapsed -= time.perf_counter() - self._active_checkpoint_started_at
         return max(0.0, elapsed)
@@ -270,7 +278,11 @@ class DeepCumuAdv:
                 "Training-time checkpoint thresholds must be strictly increasing"
             )
         self.training_time_checkpoint_seconds = schedule
-        self._next_training_time_checkpoint_index = 0
+        self._next_training_time_checkpoint_index = int(
+            self._resume_completed_checkpoint_count
+        )
+        if self._next_training_time_checkpoint_index > len(schedule):
+            raise ValueError("Restored checkpoint count exceeds the configured schedule")
         self._checkpoint_overhead_seconds = 0.0
         self._active_checkpoint_started_at = None
         self._stop_requested = False
@@ -371,6 +383,7 @@ class DeepCumuAdv:
                 checkpoint_target_nodes=checkpoint_target_nodes,
                 checkpoint_target_seconds=checkpoint_target_seconds,
             )
+            self._checkpoint_resume_rng_state = deepcopy(rng_state)
             callback = getattr(self, "_post_checkpoint_callback", None)
             if callback is not None:
                 callback(self, dict(self.checkpoint_rows[-1]))

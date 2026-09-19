@@ -1,7 +1,7 @@
 # Running the FHP UCV-ESCHER experiments on Google Cloud Batch
 
-This guide covers the repeatable Google Cloud Batch workflow for the four
-flop hold'em poker (FHP) UCV-ESCHER experiments in this repository. Each Batch
+This guide covers the active baseline and the four archived flop hold'em poker
+(FHP) UCV-ESCHER experiments in this repository. Each Batch
 job creates a temporary VM, clones the repository, installs an isolated Python
 3.11 environment, runs one experiment, uploads the complete `outputs/` tree to
 Cloud Storage, and exits. Batch owns the VM lifecycle; there is no persistent VM
@@ -28,6 +28,53 @@ The production runs are time-bound. They save reloadable policies at the first
 safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
+
+## Active Experiment 1: three-seed grouped-wide baseline
+
+The active `exp1_fhp_grouped_wide_ucv_baseline` uses a remote controller and a
+three-task Batch array rather than the archived single-job helper. Each task
+runs one of seeds `0`, `1`, and `2` on its own on-demand `n2-standard-8` VM for
+24 effective training hours. Reloadable policies and resumable continuation
+states are uploaded at 6, 12, 18, and 24 hours.
+
+After completing the one-time setup below, test locally:
+
+```bash
+./gcp/run_exp1_grouped_wide.sh smoke-local
+```
+
+Push the tested commit, then submit the remote controller:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp1-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+
+./gcp/run_exp1_grouped_wide.sh run
+```
+
+The controller submits cloud smoke first. Production is not submitted unless
+that smoke succeeds. It then launches all three seeds concurrently, waits for
+them, and runs aggregation only when every seed succeeds. The laptop may be
+disconnected after the controller job is accepted.
+
+Monitor or resume the same run with:
+
+```bash
+./gcp/run_exp1_grouped_wide.sh status
+./gcp/run_exp1_grouped_wide.sh resume
+```
+
+Keep the original `RUN_ID` and `REPO_REF` when resuming. Each training task has
+one automatic retry and restores its newest durable continuation state. The
+36-hour task ceiling allows for 24 active hours plus four grouped-policy fits,
+large state serialization and upload, setup, and teardown. Resource snapshots,
+cgroup memory events, process RSS, disk use, exit codes, Python failures, and
+kernel OOM messages are retained beneath `$BUCKET/$RUN_ID/task_diagnostics/`
+and each worker directory.
+
+The complete active protocol is in
+[`experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md`](../experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md).
 
 ## 1. Prerequisites
 

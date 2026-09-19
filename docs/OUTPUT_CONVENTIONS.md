@@ -3,7 +3,7 @@
 Experiments 1–4 are archived. New runs of these historical definitions use
 `expN_archived_` experiment identities and `expN-archived-` Batch job prefixes.
 
-Every FHP experiment writes a timestamped, single-seed run directory beneath
+Archived FHP experiments write a timestamped, single-seed run directory beneath
 the selected `--output-root`:
 
 ```text
@@ -16,7 +16,7 @@ underscores.
 
 ## Common run artifacts
 
-Successful Experiments 1-4 produce:
+Successful archived Experiments 1-4 produce:
 
 - `run_manifest.json` — immutable experiment identity, seed, canonical OpenSpiel
   FHP game definition, selected configuration and digest, checkpoint schedule,
@@ -32,8 +32,8 @@ Successful Experiments 1-4 produce:
 - `summary.json` — stop reason, throughput, final progress, memory use, final
   policy digest, execution metrics, and VM-capacity assessment.
 
-The checkpoint schedule must contain exactly two increasing targets. A valid
-production run stops with `stop_reason` equal to `training_time_budget` after
+The archived checkpoint schedule contains exactly two increasing targets. A valid
+archived production run stops with `stop_reason` equal to `training_time_budget` after
 the 12-hour checkpoint. Training elapsed time excludes checkpoint policy
 fitting and serialization, so compare training progress using
 `training_elapsed_seconds`, not only wall-clock duration.
@@ -41,6 +41,23 @@ fitting and serialization, so compare training progress using
 Checkpoint paths embedded in manifests may be absolute paths from the machine
 that performed training. Treat the manifest entry as provenance after moving a
 run; locate the file relative to the downloaded run directory.
+
+## Active Experiment 1 outputs
+
+The active `exp1_fhp_grouped_wide_ucv_baseline` writes one directory per seed
+beneath `workers/`. Each worker contains exactly four policy checkpoints and
+four full continuation states at targets 6, 12, 18, and 24 hours, plus
+incrementally durable manifests, `summary.json`, and `SUCCESS.json`.
+
+The checkpoint boundary is the first completed outer iteration after each time
+target. This may overshoot the nominal target, but makes every continuation
+state exact: no partially collected regret batch is discarded on restore.
+Use `actual_training_elapsed_seconds` to measure that overshoot. Policy fitting,
+state serialization, and upload remain outside the effective-training clock.
+
+The aggregate stage writes `analysis/seed_summaries.csv`,
+`analysis/checkpoint_index.csv`, and `analysis/experiment_manifest.json` only
+after all three seed workers validate successfully.
 
 ## Reloadable policy contract
 

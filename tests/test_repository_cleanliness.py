@@ -10,7 +10,11 @@ def test_no_obsolete_variant_references_or_outputs():
         "docs/OUTPUT_CONVENTIONS.md",
         "docs/THESIS_ARTIFACTS.md",
         "experiments/fhp/exp3_archived_ucv_escher_parallel/config.py",
+        "experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md",
+        "experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/config.py",
+        "tests/test_exp1_grouped_wide_baseline.py",
         "unbiased_escher/PARALLEL_UPSTREAM.md",
+        "unbiased_escher/grouped_wide_solver.py",
         "unbiased_escher/parallel_solver.py",
     }
     offenders = []
