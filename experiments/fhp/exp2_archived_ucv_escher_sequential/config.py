@@ -1,14 +1,14 @@
-"""Configuration for Experiment 2's sequential comparison arm."""
+"""Configuration for archived Experiment 2's sequential comparison arm."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 
-from experiments.fhp.exp1_ucv_escher_baseline import config as exp1_config
+from experiments.fhp.exp1_archived_ucv_escher_baseline import config as exp1_config
 
 
 EXPERIMENT_ID = 2
-EXPERIMENT_NAME = "exp2_fhp_ucv_escher_sequential"
+EXPERIMENT_NAME = "exp2_archived_fhp_ucv_escher_sequential"
 ALGORITHM_ID = "ucv_escher_sequential"
 ALGORITHM_LABEL = "UCV-ESCHER sequential"
 DEFAULT_SEED = exp1_config.DEFAULT_SEED

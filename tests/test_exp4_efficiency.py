@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 
-from experiments.fhp.exp1_ucv_escher_baseline.config import BEST_UCV_CONFIG
-from experiments.fhp.exp4_ucv_escher_cpu_optimized import config
-from experiments.fhp.exp4_ucv_escher_cpu_optimized.run import (
+from experiments.fhp.exp1_archived_ucv_escher_baseline.config import BEST_UCV_CONFIG
+from experiments.fhp.exp4_archived_ucv_escher_cpu_optimized import config
+from experiments.fhp.exp4_archived_ucv_escher_cpu_optimized.run import (
     _parallel_solver_kwargs,
 )
 from unbiased_escher.efficient_replay import (

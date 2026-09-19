@@ -9,7 +9,7 @@ def test_no_obsolete_variant_references_or_outputs():
         "README.md",
         "docs/OUTPUT_CONVENTIONS.md",
         "docs/THESIS_ARTIFACTS.md",
-        "experiments/fhp/exp3_ucv_escher_parallel/config.py",
+        "experiments/fhp/exp3_archived_ucv_escher_parallel/config.py",
         "unbiased_escher/PARALLEL_UPSTREAM.md",
         "unbiased_escher/parallel_solver.py",
     }

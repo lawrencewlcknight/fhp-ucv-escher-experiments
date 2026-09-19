@@ -1,14 +1,14 @@
-"""Configuration for Experiment 3's Ray-parallel comparison arm."""
+"""Configuration for archived Experiment 3's Ray-parallel comparison arm."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 
-from experiments.fhp.exp1_ucv_escher_baseline import config as exp1_config
+from experiments.fhp.exp1_archived_ucv_escher_baseline import config as exp1_config
 
 
 EXPERIMENT_ID = 3
-EXPERIMENT_NAME = "exp3_fhp_ucv_escher_ray_parallel"
+EXPERIMENT_NAME = "exp3_archived_fhp_ucv_escher_ray_parallel"
 ALGORITHM_ID = "ucv_escher_ray_parallel"
 ALGORITHM_LABEL = "UCV-ESCHER Ray parallel (12 workers)"
 DEFAULT_SEED = exp1_config.DEFAULT_SEED

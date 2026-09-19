@@ -1,14 +1,14 @@
-"""Configuration for Experiment 4's high-throughput CPU implementation."""
+"""Configuration for archived Experiment 4's high-throughput CPU implementation."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 
-from experiments.fhp.exp1_ucv_escher_baseline import config as exp1_config
+from experiments.fhp.exp1_archived_ucv_escher_baseline import config as exp1_config
 
 
 EXPERIMENT_ID = 4
-EXPERIMENT_NAME = "exp4_fhp_ucv_escher_cpu_optimized"
+EXPERIMENT_NAME = "exp4_archived_fhp_ucv_escher_cpu_optimized"
 ALGORITHM_ID = "ucv_escher_cpu_optimized"
 ALGORITHM_LABEL = "UCV-ESCHER CPU-optimised parallel"
 DEFAULT_SEED = exp1_config.DEFAULT_SEED

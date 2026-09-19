@@ -7,6 +7,10 @@ job creates a temporary VM, clones the repository, installs an isolated Python
 Cloud Storage, and exits. Batch owns the VM lifecycle; there is no persistent VM
 to shut down after a completed job.
 
+Experiments 1–4 are archived. These instructions are retained for exact
+historical reproduction; every maintained module and job name includes
+`archived` to distinguish a rerun from new research.
+
 The end-to-end workflow is:
 
 1. configure and authenticate the Google Cloud CLI;
@@ -184,7 +188,7 @@ training run is not silently repeated. It captures stdout and stderr, records
 15-second resource snapshots, classifies failures, and uploads outputs from an
 exit trap on both success and failure.
 
-## 5. Experiment allocations
+## 5. Archived experiment allocations
 
 | Experiment | Backend | Full-run VM | CPU request | Memory request | Boot disk |
 |---|---|---:|---:|---:|---:|
@@ -202,100 +206,100 @@ work and checkpoint thresholds.
 
 Run the matching smoke job before each full job.
 
-### Experiment 1
+### Archived Experiment 1
 
 ```bash
-JOB_NAME="exp1-fhp-ucv-baseline-smoke-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp1-archived-fhp-ucv-baseline-smoke-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
+  "python -m experiments.fhp.exp1_archived_ucv_escher_baseline.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
-### Experiment 2
+### Archived Experiment 2
 
 ```bash
-JOB_NAME="exp2-fhp-ucv-sequential-smoke-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp2-archived-fhp-ucv-sequential-smoke-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
+  "python -m experiments.fhp.exp2_archived_ucv_escher_sequential.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
-### Experiment 3
+### Archived Experiment 3
 
 ```bash
-JOB_NAME="exp3-fhp-ucv-parallel-smoke-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp3-archived-fhp-ucv-parallel-smoke-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
+  "python -m experiments.fhp.exp3_archived_ucv_escher_parallel.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
-### Experiment 4
+### Archived Experiment 4
 
 ```bash
-JOB_NAME="exp4-fhp-ucv-cpu-optimized-smoke-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp4-archived-fhp-ucv-cpu-optimized-smoke-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
+  "python -m experiments.fhp.exp4_archived_ucv_escher_cpu_optimized.run \
     --smoke --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-4 7200 4000 16000 100 pd-balanced
 ```
 
 ## 7. Submit full runs
 
-### Experiment 1
+### Archived Experiment 1
 
 ```bash
-JOB_NAME="exp1-fhp-ucv-baseline-full-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp1-archived-fhp-ucv-baseline-full-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp1_ucv_escher_baseline.run \
+  "python -m experiments.fhp.exp1_archived_ucv_escher_baseline.run \
     --output-root outputs/cloud/$JOB_NAME" \
   n2-standard-8 50400 8000 32000 100 pd-balanced
 ```
 
-### Experiment 2
+### Archived Experiment 2
 
 ```bash
-JOB_NAME="exp2-fhp-ucv-sequential-full-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp2-archived-fhp-ucv-sequential-full-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp2_ucv_escher_sequential.run \
+  "python -m experiments.fhp.exp2_archived_ucv_escher_sequential.run \
     --output-root outputs/cloud/$JOB_NAME" \
   c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
-### Experiment 3
+### Archived Experiment 3
 
 ```bash
-JOB_NAME="exp3-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp3-archived-fhp-ucv-parallel-full-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp3_ucv_escher_parallel.run \
+  "python -m experiments.fhp.exp3_archived_ucv_escher_parallel.run \
     --output-root outputs/cloud/$JOB_NAME" \
   c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
 
-### Experiment 4
+### Archived Experiment 4
 
 ```bash
-JOB_NAME="exp4-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
+JOB_NAME="exp4-archived-fhp-ucv-cpu-optimized-full-$(date -u +%Y%m%d-%H%M%S)"
 
 ./gcp/submit_batch_experiment.sh \
   "$JOB_NAME" \
-  "python -m experiments.fhp.exp4_ucv_escher_cpu_optimized.run \
+  "python -m experiments.fhp.exp4_archived_ucv_escher_cpu_optimized.run \
     --output-root outputs/cloud/$JOB_NAME" \
   c4-standard-32 50400 32000 120000 200 hyperdisk-balanced
 ```
@@ -400,7 +404,7 @@ Keep the disk family compatible with the machine family:
 - the helper rejects a C4-family machine combined with any `pd-*` disk before
   contacting Batch.
 
-The production allocations in section 5 are part of the experiment contract.
+The archived production allocations in section 5 are part of the experiment contract.
 If you change them for exploratory capacity testing, use a distinct job name
 and record the changed allocation with the result. Do not present a modified
 allocation as a canonical Experiment 1-4 run.

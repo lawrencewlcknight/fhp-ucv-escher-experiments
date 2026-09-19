@@ -1,4 +1,4 @@
-"""Configuration for FHP Experiment 1."""
+"""Configuration for archived FHP Experiment 1."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Mapping
 
 
 EXPERIMENT_ID = 1
-EXPERIMENT_NAME = "exp1_fhp_ucv_escher_baseline"
+EXPERIMENT_NAME = "exp1_archived_fhp_ucv_escher_baseline"
 ALGORITHM_ID = "ucv_escher"
 ALGORITHM_LABEL = "UCV-ESCHER"
 DEFAULT_SEED = 0
@@ -81,7 +81,7 @@ REFERENCE_VM = {
 
 def validate_config(config: Mapping[str, object]) -> None:
     if config.get("game_name") != "FHP":
-        raise ValueError("Experiment 1 must use the canonical FHP loader")
+        raise ValueError("Archived Experiment 1 must use the canonical FHP loader")
     if int(config["q_ensemble_size"]) != 3:
         raise ValueError("The transferred UCV configuration uses three Q folds")
     if int(config["evaluation_frequency"]) != 0:

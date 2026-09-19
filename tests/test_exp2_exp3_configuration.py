@@ -1,7 +1,7 @@
-from experiments.fhp.exp1_ucv_escher_baseline.config import BEST_UCV_CONFIG
-from experiments.fhp.exp2_ucv_escher_sequential import config as sequential
-from experiments.fhp.exp3_ucv_escher_parallel import config as parallel
-from experiments.fhp.exp3_ucv_escher_parallel.run import _parallel_solver_kwargs
+from experiments.fhp.exp1_archived_ucv_escher_baseline.config import BEST_UCV_CONFIG
+from experiments.fhp.exp2_archived_ucv_escher_sequential import config as sequential
+from experiments.fhp.exp3_archived_ucv_escher_parallel import config as parallel
+from experiments.fhp.exp3_archived_ucv_escher_parallel.run import _parallel_solver_kwargs
 from unbiased_escher.parallel_utils import partition_total, worker_seed
 
 

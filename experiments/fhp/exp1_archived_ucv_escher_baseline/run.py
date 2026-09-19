@@ -1,4 +1,4 @@
-"""Run FHP Experiment 1 and save reloadable policy checkpoints."""
+"""Run archived FHP Experiment 1 and save reloadable policy checkpoints."""
 
 from __future__ import annotations
 
@@ -144,7 +144,7 @@ def run_experiment(
     reference_vm: Mapping[str, object] = REFERENCE_VM,
     solver_class=UnbiasedControlVariateEscher,
     solver_extra_kwargs: Mapping[str, object] | None = None,
-    checkpoint_prefix: str = "exp1_fhp_ucv_escher",
+    checkpoint_prefix: str = "exp1_archived_fhp_ucv_escher",
     execution_backend: str = "sequential",
     implementation_provenance: Mapping[str, object] | None = None,
 ) -> Path:

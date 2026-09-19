@@ -16,7 +16,7 @@ FHP-specific integration replaces Leduc game loading with the canonical
 OpenSpiel `universal_poker` definition, uses compact worker scratch storage
 sized from FHP's maximum game length, records parallel timing/payload metrics,
 and divides each frozen traverser phase into bounded synchronized dispatches.
-The bounded dispatches allow the inherited Experiment 1 training-time mechanism
+The bounded dispatches allow the inherited archived Experiment 1 training-time mechanism
 to save at the first safe merge boundary after 6 and 12 hours and to stop after
 the final checkpoint. They do not introduce asynchronous gradients or multiply
 the configured traversal budget.

@@ -1,4 +1,4 @@
-"""Validate and compare completed Experiment 2 and Experiment 3 run outputs."""
+"""Validate and compare archived Experiment 2 and Experiment 3 outputs."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ def compare_runs(sequential_run: Path, parallel_run: Path) -> dict:
         )
 
     return {
-        "comparison": "exp2_sequential_vs_exp3_ray_parallel",
+        "comparison": "archived_exp2_sequential_vs_exp3_ray_parallel",
         "seed": int(sequential_manifest["seed"]),
         "game": sequential_manifest["game"],
         "checkpoint_training_seconds": sequential_manifest[
@@ -113,8 +113,8 @@ def compare_runs(sequential_run: Path, parallel_run: Path) -> dict:
 def write_comparison(comparison: dict, output_dir: Path) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "exp2_exp3_comparison.json"
-    csv_path = output_dir / "exp2_exp3_checkpoint_comparison.csv"
+    json_path = output_dir / "archived_exp2_exp3_comparison.json"
+    csv_path = output_dir / "archived_exp2_exp3_checkpoint_comparison.csv"
     json_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
     rows = comparison["rows"]
     with open(csv_path, "w", newline="", encoding="utf-8") as handle:

@@ -18,7 +18,7 @@ def test_generated_batch_script_has_valid_shell_and_diagnostics(tmp_path, monkey
         "JOB_JSON": str(job_json),
         "JOB_NAME": "diagnostics-shell-test",
         "EXPERIMENT_COMMAND": (
-            "python -m experiments.fhp.exp1_ucv_escher_baseline.run"
+            "python -m experiments.fhp.exp1_archived_ucv_escher_baseline.run"
         ),
         "MACHINE_TYPE": "n2-standard-8",
         "MAX_RUN_SECONDS": "50400",
@@ -73,7 +73,7 @@ def test_generated_batch_job_uses_configured_hyperdisk(tmp_path, monkeypatch):
         "JOB_JSON": str(job_json),
         "JOB_NAME": "hyperdisk-test",
         "EXPERIMENT_COMMAND": (
-            "python -m experiments.fhp.exp2_ucv_escher_sequential.run"
+            "python -m experiments.fhp.exp2_archived_ucv_escher_sequential.run"
         ),
         "MACHINE_TYPE": "c4-standard-32",
         "MAX_RUN_SECONDS": "50400",
@@ -147,20 +147,20 @@ def test_readme_documents_gcp_smoke_and_full_runs_for_all_experiments():
     )[0]
     experiments = (
         (
-            "exp1-fhp-ucv-baseline",
-            "experiments.fhp.exp1_ucv_escher_baseline.run",
+            "exp1-archived-fhp-ucv-baseline",
+            "experiments.fhp.exp1_archived_ucv_escher_baseline.run",
         ),
         (
-            "exp2-fhp-ucv-sequential",
-            "experiments.fhp.exp2_ucv_escher_sequential.run",
+            "exp2-archived-fhp-ucv-sequential",
+            "experiments.fhp.exp2_archived_ucv_escher_sequential.run",
         ),
         (
-            "exp3-fhp-ucv-parallel",
-            "experiments.fhp.exp3_ucv_escher_parallel.run",
+            "exp3-archived-fhp-ucv-parallel",
+            "experiments.fhp.exp3_archived_ucv_escher_parallel.run",
         ),
         (
-            "exp4-fhp-ucv-cpu-optimized",
-            "experiments.fhp.exp4_ucv_escher_cpu_optimized.run",
+            "exp4-archived-fhp-ucv-cpu-optimized",
+            "experiments.fhp.exp4_archived_ucv_escher_cpu_optimized.run",
         ),
     )
 

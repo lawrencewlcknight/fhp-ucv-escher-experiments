@@ -1,5 +1,8 @@
 # Output conventions
 
+Experiments 1–4 are archived. New runs of these historical definitions use
+`expN_archived_` experiment identities and `expN-archived-` Batch job prefixes.
+
 Every FHP experiment writes a timestamped, single-seed run directory beneath
 the selected `--output-root`:
 
@@ -72,22 +75,22 @@ and record at least:
 Do not interpret training loss or nodes per second as policy strength. They are
 training and systems diagnostics.
 
-## Experiment 2 versus Experiment 3 comparison
+## Archived Experiment 2 versus Experiment 3 comparison
 
 After downloading matched Experiment 2 and Experiment 3 runs, create the
 time-aligned systems comparison with:
 
 ```bash
-python -m experiments.fhp.compare_exp2_exp3 \
+python -m experiments.fhp.compare_archived_exp2_exp3 \
   --sequential-run outputs/RUN_FOR_EXP2 \
   --parallel-run outputs/RUN_FOR_EXP3 \
-  --output-dir outputs/exp2_exp3_comparison
+  --output-dir outputs/archived_exp2_exp3_comparison
 ```
 
 The comparison directory contains:
 
-- `exp2_exp3_comparison.json`;
-- `exp2_exp3_checkpoint_comparison.csv`.
+- `archived_exp2_exp3_comparison.json`;
+- `archived_exp2_exp3_checkpoint_comparison.csv`.
 
 These files compare nodes, trajectories, iterations, fitting loss, and
 parallel-over-sequential throughput at the matched checkpoints. They do not

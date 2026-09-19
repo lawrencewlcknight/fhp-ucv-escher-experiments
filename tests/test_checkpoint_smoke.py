@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from experiments.fhp.exp1_ucv_escher_baseline.config import smoke_config
-from experiments.fhp.exp1_ucv_escher_baseline.run import run_experiment
+from experiments.fhp.exp1_archived_ucv_escher_baseline.config import smoke_config
+from experiments.fhp.exp1_archived_ucv_escher_baseline.run import run_experiment
 from fhp_escher.checkpointing import LoadedFHPPolicy, load_checkpoint_payload
 from fhp_escher.game import load_fhp_game
 
@@ -19,12 +19,12 @@ def test_smoke_run_saves_reloadable_final_policy(tmp_path: Path):
     )
     final_checkpoint = run_dir / "final_policy_checkpoint.pkl"
     payload = load_checkpoint_payload(final_checkpoint)
-    assert run_dir.name.startswith("exp1_fhp_ucv_escher_baseline_")
+    assert run_dir.name.startswith("exp1_archived_fhp_ucv_escher_baseline_")
     assert payload["algorithm"] == "UCV-ESCHER"
     assert payload["algorithm_id"] == "ucv_escher"
     assert payload["execution_backend"] == "sequential"
     assert payload["experiment_id"] == 1
-    assert payload["experiment_name"] == "exp1_fhp_ucv_escher_baseline"
+    assert payload["experiment_name"] == "exp1_archived_fhp_ucv_escher_baseline"
     assert payload["seed"] == 7
     assert payload["nodes_touched"] > 0
     assert payload["checkpoint_kind"] == "training_time_checkpoint"
