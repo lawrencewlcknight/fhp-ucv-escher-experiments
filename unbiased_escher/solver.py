@@ -796,7 +796,9 @@ class UnbiasedControlVariateEscher(VRDeepPDCFRPlus):
             state,
             traverser,
         )
-        infostate = state.information_state_tensor(traverser)
+        # Route through the solver hook so game-specific, checkpointed feature
+        # encoders are used consistently by calibration and the other learners.
+        infostate = self.get_infostate_tensor(state, traverser)
         if self.calibration_trainer is not None:
             residual_means, predicted_variances, calibration_features = (
                 self.calibration_trainer.predict_all(

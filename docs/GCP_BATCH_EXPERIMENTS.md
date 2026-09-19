@@ -1,15 +1,15 @@
 # Running the FHP UCV-ESCHER experiments on Google Cloud Batch
 
-This guide covers the active baseline and the four archived flop hold'em poker
+This guide covers the active experiments and the four archived flop hold'em poker
 (FHP) UCV-ESCHER experiments in this repository. Each Batch
 job creates a temporary VM, clones the repository, installs an isolated Python
 3.11 environment, runs one experiment, uploads the complete `outputs/` tree to
 Cloud Storage, and exits. Batch owns the VM lifecycle; there is no persistent VM
 to shut down after a completed job.
 
-Experiments 1–4 are archived. These instructions are retained for exact
-historical reproduction; every maintained module and job name includes
-`archived` to distinguish a rerun from new research.
+The four original experiments are archived. Their instructions are retained for
+exact historical reproduction; every maintained legacy module and job name
+includes `archived` to distinguish a rerun from active Experiments 1 and 2.
 
 The end-to-end workflow is:
 
@@ -75,6 +75,46 @@ and each worker directory.
 
 The complete active protocol is in
 [`experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md`](../experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md).
+
+## Active Experiment 2: lossless structured FHP input
+
+Experiment 2 uses the same controller, cloud-smoke gate, three parallel seed
+workers, one-retry policy, 24-hour effective training limit, four six-hourly
+checkpoints, durable continuation states, aggregation, and failure diagnostics
+as active Experiment 1. It runs one on-demand `n2-standard-8` VM for each seed.
+
+Test the complete worker locally:
+
+```bash
+./gcp/run_exp2_lossless_structured.sh smoke-local
+```
+
+Push the tested commit and submit the controller:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp2-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+
+./gcp/run_exp2_lossless_structured.sh run
+```
+
+To run only the GCP smoke job, without permitting production submission:
+
+```bash
+./gcp/run_exp2_lossless_structured.sh smoke-cloud
+```
+
+Monitor or resume a submitted run with the original `RUN_ID` and `REPO_REF`:
+
+```bash
+./gcp/run_exp2_lossless_structured.sh status
+./gcp/run_exp2_lossless_structured.sh resume
+```
+
+Downloaded artifacts use the same layout as Experiment 1 beneath
+`$BUCKET/$RUN_ID/`. The complete representation and evaluation contract is in
+[`experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md`](../experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md).
 
 ## 1. Prerequisites
 

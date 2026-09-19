@@ -35,14 +35,33 @@ export RUN_ID="exp1-fhp-$(date -u '+%Y%m%d-%H%M%S')"
 
 See the [complete experiment protocol](experiments/fhp/exp1_fhp_grouped_wide_ucv_baseline/README.md).
 
+## Active Experiment 2: lossless structured FHP representation
+
+`exp2_fhp_lossless_structured_ucv` keeps Experiment 1's UCV-ESCHER estimator
+and 24-hour, three-seed protocol but replaces the generic OpenSpiel input with
+a versioned FHP encoder. It uses canonical suits, exact compact betting history,
+poker-derived features, a non-duplicated critic state, structured card/context
+networks, and float32 replay. It does not bucket hands or discard strategically
+relevant information.
+
+```bash
+./gcp/run_exp2_lossless_structured.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp2-fhp-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp2_lossless_structured.sh run
+```
+
+See the [Experiment 2 protocol](experiments/fhp/exp2_fhp_lossless_structured_ucv/README.md).
+
 ## Shared policy evaluation
 
-FHP checkpoints are evaluated through the sibling `fhp-evaluation-suite`, not
-through an algorithm-specific copy. The adapter is
-`fhp_escher.evaluation_adapter`. Install it from this directory with
-`python -m pip install -e ../../fhp-evaluation-suite`; then run
-`fhp-evaluate benchmark CHECKPOINT --deals 10000 --seed 2026` or
-`fhp-evaluate lbr CHECKPOINT --deals 1000 --seed 2026`.
+FHP checkpoints are evaluated through the sibling `fhp-evaluation-suite`, with
+checkpoint reconstruction supplied by `fhp_escher.evaluation_adapter`. Install
+the suite from this directory with
+`python -m pip install -e ../../fhp-evaluation-suite`. Raw-OpenSpiel checkpoints
+can also use its `fhp-evaluate` CLI directly. Experiment 2 checkpoints must use
+this repository's encoder-aware evaluator shown below.
 
 The benchmark uses both-seat duplicate deals and corrected LooseAggressive
 bands `(-300,-100)`. LBR is reported as a lower bound, not exact exploitability.
@@ -66,6 +85,13 @@ checkpoints for one seed worker:
 
 ```bash
 python -m experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.evaluate_checkpoints \
+  --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
+```
+
+Experiment 2 uses the same evaluation schedule with its encoder-aware loader:
+
+```bash
+python -m experiments.fhp.exp2_fhp_lossless_structured_ucv.evaluate_checkpoints \
   --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
 ```
 

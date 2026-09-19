@@ -39,6 +39,8 @@ def save_policy_checkpoint(
         name: tensor.detach().cpu().clone()
         for name, tensor in solver.ave_policy_trainer.model.state_dict().items()
     }
+    model = solver.ave_policy_trainer.model
+    feature_encoder = getattr(solver, "feature_encoder", None)
     payload = {
         "version": CHECKPOINT_VERSION,
         "type": CHECKPOINT_TYPE,
@@ -69,6 +71,14 @@ def save_policy_checkpoint(
         "policy_network_layers": list(
             getattr(solver, "average_policy_network_layers", solver.network_layers)
         ),
+        "feature_encoder": (
+            None if feature_encoder is None else feature_encoder.metadata()
+        ),
+        "policy_model": (
+            model.checkpoint_metadata()
+            if hasattr(model, "checkpoint_metadata")
+            else {"type": "mlp_v1"}
+        ),
         "policy_state_dict": state_dict,
     }
     path = Path(path)
@@ -97,17 +107,46 @@ class LoadedFHPPolicy(policy.Policy):
     def __init__(self, game, checkpoint_path: str | Path):
         import torch
 
+        from fhp_escher.features import (
+            FeatureLayout,
+            StructuredFHPMLP,
+            encoder_from_metadata,
+        )
         from vr_deep_cfr.solver import MLP
 
         super().__init__(game, list(range(game.num_players())))
         self.game = game
         self.checkpoint_path = Path(checkpoint_path)
         self.checkpoint = load_checkpoint_payload(checkpoint_path)
-        self.model = MLP(
-            int(self.checkpoint["input_size"]),
-            [int(value) for value in self.checkpoint["policy_network_layers"]],
-            int(self.checkpoint["num_actions"]),
+        self.feature_encoder = encoder_from_metadata(
+            self.checkpoint.get("feature_encoder")
         )
+        model_metadata = self.checkpoint.get("policy_model", {"type": "mlp_v1"})
+        if model_metadata.get("type") == "mlp_v1":
+            self.model = MLP(
+                int(self.checkpoint["input_size"]),
+                [int(value) for value in self.checkpoint["policy_network_layers"]],
+                int(self.checkpoint["num_actions"]),
+            )
+        elif model_metadata.get("type") == "structured_fhp_mlp_v1":
+            layout_metadata = model_metadata["layout"]
+            layout = FeatureLayout(
+                name=str(layout_metadata["name"]),
+                total_size=int(layout_metadata["total_size"]),
+                card_size=int(layout_metadata["card_size"]),
+            )
+            if self.feature_encoder is None:
+                raise ValueError("Structured FHP checkpoint has no feature encoder")
+            if layout != self.feature_encoder.policy_layout:
+                raise ValueError("Checkpoint policy layout differs from its encoder")
+            self.model = StructuredFHPMLP(
+                layout,
+                [int(value) for value in model_metadata["hidden_layers"]],
+                int(model_metadata["output_size"]),
+                branch_width=int(model_metadata["branch_width"]),
+            )
+        else:
+            raise ValueError(f"Unsupported checkpoint policy model: {model_metadata!r}")
         self.model.load_state_dict(self.checkpoint["policy_state_dict"])
         self.model.eval()
         self._torch = torch
@@ -117,9 +156,12 @@ class LoadedFHPPolicy(policy.Policy):
         legal_actions = state.legal_actions(player)
         if not legal_actions:
             return {}
-        info_state = self._torch.as_tensor(
-            state.information_state_tensor(player), dtype=self._torch.float32
+        encoded = (
+            state.information_state_tensor(player)
+            if self.feature_encoder is None
+            else self.feature_encoder.information_state(state, player)
         )
+        info_state = self._torch.as_tensor(encoded, dtype=self._torch.float32)
         legal_mask = self._torch.as_tensor(
             state.legal_actions_mask(player), dtype=self._torch.bool
         )

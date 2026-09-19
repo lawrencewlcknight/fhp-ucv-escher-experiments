@@ -27,10 +27,10 @@ def _import_suite():
 
 def load_policy_for_evaluation(checkpoint_path):
     _import_suite()
-    from fhp_evaluation.loaders import load_checkpoint_policy
+    from fhp_escher.checkpointing import LoadedFHPPolicy
 
     game = load_fhp_game()
-    return game, load_checkpoint_policy(game, checkpoint_path)
+    return game, LoadedFHPPolicy(game, checkpoint_path)
 
 
 def evaluate_checkpoint(

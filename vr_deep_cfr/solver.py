@@ -544,8 +544,12 @@ class DeepCumuAdv:
             )
         return value
 
-    def get_infostate_tensor(self, s):
-        return s.information_state_tensor()
+    def get_infostate_tensor(self, s, player=None):
+        return (
+            s.information_state_tensor()
+            if player is None
+            else s.information_state_tensor(int(player))
+        )
 
     def get_history_tensor(self, s):
         return np.append(

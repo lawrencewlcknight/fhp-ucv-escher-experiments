@@ -1,6 +1,6 @@
 # Output conventions
 
-Experiments 1–4 are archived. New runs of these historical definitions use
+The four original experiments are archived. New runs of these historical definitions use
 `expN_archived_` experiment identities and `expN-archived-` Batch job prefixes.
 
 Archived FHP experiments write a timestamped, single-seed run directory beneath
@@ -58,6 +58,18 @@ state serialization, and upload remain outside the effective-training clock.
 The aggregate stage writes `analysis/seed_summaries.csv`,
 `analysis/checkpoint_index.csv`, and `analysis/experiment_manifest.json` only
 after all three seed workers validate successfully.
+
+## Active Experiment 2 outputs
+
+`exp2_fhp_lossless_structured_ucv` uses the same three-worker, four-checkpoint
+directory contract as active Experiment 1. Its run manifest and every policy
+checkpoint additionally record the complete `fhp_lossless_suit_canonical_v1`
+encoder contract. The policy input has 183 values and the critic full-state
+input has 263 values. Loading fails if the encoder metadata, structured model
+layout, or checkpoint weights disagree.
+
+Experiment 2 continuation states also retain the independent float32 replay
+sampler states, so a retried Batch task resumes the same sampling streams.
 
 ## Reloadable policy contract
 
