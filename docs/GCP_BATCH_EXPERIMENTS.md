@@ -239,10 +239,27 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="roles/batch.agentReporter"
 
+# The remote controller creates and monitors smoke, training, and aggregation
+# child jobs.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/batch.jobsEditor"
+
 gcloud storage buckets add-iam-policy-binding "$BUCKET" \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="roles/storage.objectAdmin"
+
+# Allow the controller service account to attach itself to its child jobs.
+gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+  --project="$PROJECT_ID" \
+  --member="serviceAccount:${SA_EMAIL}" \
+  --role="roles/iam.serviceAccountUser"
 ```
+
+The active launchers verify that the configured service account exists before
+submitting a cloud job. The remote controller also verifies that it can list
+Batch jobs and exits immediately if child-job permissions are missing; it does
+not remain alive in a polling loop after an IAM failure.
 
 Allow your user account to submit jobs as the service account and inspect logs:
 

@@ -62,6 +62,33 @@ submit_job() {
   gcloud batch jobs submit "$1" --project "$PROJECT_ID" \
     --location "$REGION" --config "$2"
 }
+preflight_service_account() {
+  local described_email
+  if ! described_email="$(
+    gcloud iam service-accounts describe "$SA_EMAIL" \
+      --project "$PROJECT_ID" --format='value(email)' 2>&1
+  )"; then
+    echo "Configured Batch service account does not exist or is inaccessible: $SA_EMAIL" >&2
+    echo "$described_email" >&2
+    return 2
+  fi
+  if [[ "$described_email" != "$SA_EMAIL" ]]; then
+    echo "Service-account preflight returned an unexpected identity: $described_email" >&2
+    return 2
+  fi
+}
+preflight_remote_controller() {
+  local error_output
+  if ! error_output="$(
+    gcloud batch jobs list --project "$PROJECT_ID" --location "$REGION" \
+      --limit=1 --format='value(name)' 2>&1
+  )"; then
+    echo "Remote controller cannot inspect Batch jobs using $SA_EMAIL." >&2
+    echo "Grant roles/batch.jobsEditor to the service account before retrying." >&2
+    echo "$error_output" >&2
+    return 2
+  fi
+}
 job_state() {
   gcloud batch jobs describe "$1" --project "$PROJECT_ID" \
     --location "$REGION" --format='value(status.state)'
@@ -69,7 +96,10 @@ job_state() {
 wait_for_job() {
   local state
   while true; do
-    state="$(job_state "$1")"
+    if ! state="$(job_state "$1")"; then
+      echo "Unable to inspect Batch job $1; aborting controller." >&2
+      return 2
+    fi
     echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $1: $state"
     case "$state" in
       SUCCEEDED) return 0 ;;
@@ -86,7 +116,7 @@ ensure_job_succeeds() {
     wait_for_job "$1"
     return
   fi
-  submit_job "$1" "$2"
+  submit_job "$1" "$2" || return $?
   wait_for_job "$1"
 }
 complete_or_retry() {
@@ -97,9 +127,13 @@ complete_or_retry() {
       wait_for_job "$1" && return 0
     fi
   fi
-  submit_job "$2" "$3"
+  submit_job "$2" "$3" || return $?
   wait_for_job "$2"
 }
+
+case "$ACTION" in
+  run|resume|smoke-cloud) preflight_service_account ;;
+esac
 
 build_json controller "$TEMP_DIR/controller.json"
 build_json smoke "$TEMP_DIR/smoke.json"
@@ -131,6 +165,7 @@ case "$ACTION" in
       echo "Internal action" >&2
       exit 2
     }
+    preflight_remote_controller
     ensure_job_succeeds "$SMOKE_JOB" "$TEMP_DIR/smoke.json" || {
       echo "Cloud smoke failed; production was not submitted." >&2
       exit 1
@@ -143,6 +178,7 @@ case "$ACTION" in
       echo "Internal action" >&2
       exit 2
     }
+    preflight_remote_controller
     complete_or_retry "${RUN_ID}-smoke" "$SMOKE_JOB" "$TEMP_DIR/smoke.json"
     complete_or_retry "${RUN_ID}-train" "$TRAIN_JOB" "$TEMP_DIR/train.json"
     complete_or_retry "${RUN_ID}-aggregate" "$AGGREGATE_JOB" "$TEMP_DIR/aggregate.json"
