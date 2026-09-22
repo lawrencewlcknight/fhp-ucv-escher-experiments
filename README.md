@@ -82,12 +82,13 @@ See the [Experiment 3 protocol](experiments/fhp/exp3_fhp_wider_lossless_structur
 
 ## Shared policy evaluation
 
-FHP checkpoints are evaluated through the sibling `fhp-evaluation-suite`, with
-checkpoint reconstruction supplied by `fhp_escher.evaluation_adapter`. Install
-the suite from this directory with
-`python -m pip install -e ../../fhp-evaluation-suite`. Raw-OpenSpiel checkpoints
-can also use its `fhp-evaluate` CLI directly. Experiment 2 and Experiment 3
-checkpoints must use this repository's encoder-aware evaluators shown below.
+FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
+implementation, with checkpoint reconstruction supplied by
+`fhp_escher.evaluation_adapter`. A provenance-recorded snapshot is vendored in
+this repository so pinned cloud jobs are self-contained. The sibling package
+can still be installed during evaluator development with
+`python -m pip install -e ../../fhp-evaluation-suite`. Experiment 2 and
+Experiment 3 checkpoints must use the encoder-aware evaluators shown below.
 
 The benchmark uses both-seat duplicate deals and corrected LooseAggressive
 bands `(-300,-100)`. LBR is reported as a lower bound, not exact exploitability.
@@ -124,6 +125,50 @@ python -m experiments.fhp.exp2_fhp_lossless_structured_ucv.evaluate_checkpoints 
 python -m experiments.fhp.exp3_fhp_wider_lossless_structured_ucv.evaluate_checkpoints \
   --source-run cloud_outputs/RUN_ID/workers/TASK_DIRECTORY
 ```
+
+### Single-VM retrospective evaluation of Experiments 2 and 3
+
+The joint evaluation is an extension of Experiments 2 and 3, not a new
+training experiment. One `n2-standard-8` VM evaluates all three seeds and all
+four checkpoints against the five rule agents and LBR, performs temporal and
+direct cross-play, and creates seed-level tables and charts. Training-state
+files are explicitly excluded from the cloud download. A small real-checkpoint
+smoke test must succeed on the VM before the production evaluation begins.
+
+Set the two immutable source runs and a new append-only evaluation run ID:
+
+```bash
+export EXP2_RUN_ID="exp2-fhp-20260921-093839"
+export EXP3_RUN_ID="exp3-fhp-20260921-093839"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="fhp-eval23-$(date -u '+%Y%m%d-%H%M%S')"
+
+./gcp/run_retrospective_exp2_exp3_evaluation.sh run
+```
+
+The submitting computer is not needed after Batch accepts the job. Monitor it
+with the same variables:
+
+```bash
+./gcp/run_retrospective_exp2_exp3_evaluation.sh status
+```
+
+An optional local smoke uses the already-downloaded checkpoints:
+
+```bash
+./gcp/run_retrospective_exp2_exp3_evaluation.sh smoke-local
+```
+
+Download the compact analysis after the job succeeds:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID"
+gcloud storage cp --recursive \
+  "$BUCKET/$RUN_ID/analysis" \
+  "cloud_outputs/$RUN_ID/"
+```
+
+See the [retrospective evaluation protocol](experiments/fhp/retrospective_exp2_exp3_evaluation/README.md).
 
 After archived Experiments 1--4 have been evaluated with the same configuration,
 build the common-deal 6-hour and 12-hour cross-play matrices with:
