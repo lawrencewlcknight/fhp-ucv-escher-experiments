@@ -158,4 +158,5 @@ def test_batch_job_is_one_standard_n2_vm_with_cloud_smoke():
     script = group["taskSpec"]["runnables"][0]["script"]["text"]
     assert "--smoke" in script
     assert "--workers 8" in script
-    assert "training_states" in script
+    assert script.count("--exclude='.*training_states.*'") == 2
+    assert "(^|/)training_states" not in script

@@ -93,10 +93,10 @@ python -m fhp_escher.batch_diagnostics monitor \
 MONITOR_PID="$!"
 
 gcloud storage rsync --recursive \
-  --exclude='(^|/)training_states(/|$)' \
+  --exclude='.*training_states.*' \
   "$BUCKET_ROOT/$EXP2_RUN_ID/workers" "$INPUT_ROOT/exp2/workers"
 gcloud storage rsync --recursive \
-  --exclude='(^|/)training_states(/|$)' \
+  --exclude='.*training_states.*' \
   "$BUCKET_ROOT/$EXP3_RUN_ID/workers" "$INPUT_ROOT/exp3/workers"
 
 python -m experiments.fhp.retrospective_exp2_exp3_evaluation.run \
