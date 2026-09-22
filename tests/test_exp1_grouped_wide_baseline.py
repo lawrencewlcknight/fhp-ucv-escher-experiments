@@ -2,25 +2,41 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import random
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.config import (
     CHECKPOINT_TRAINING_SECONDS,
     EXPERIMENT_35_CONFIG,
     PRODUCTION_SEEDS,
+    REPLAY_STORAGE,
     checkpoint_schedule,
     smoke_config,
     task_schedule,
     validate_contract,
 )
+from experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.float32_solver import (
+    Float32LegacyCircularBuffer,
+    Float32LegacyReservoirBuffer,
+    validate_replay_storage,
+)
 from experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.run import _run_task
-from experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.worker import _make_solver
+from experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.worker import (
+    _make_solver,
+    _solver_kwargs,
+)
 from unbiased_escher.grouped_wide_solver import (
     GROUPED_SOFT_TARGET_CROSS_ENTROPY,
+    GroupedSoftTargetCrossEntropyAvePolicyTrainer,
+    GroupedWideUnbiasedControlVariateEscher,
+    TemporallyAveragedCrossFittedQMember,
 )
+from vr_deep_cfr.solver import CircularBuffer, ReservoirBuffer
+from vr_deep_cfr.variants import VRDCFRPlusRegretTrainer
 
 
 def _load_batch_builder():
@@ -127,6 +143,10 @@ def test_four_checkpoint_policy_and_resume_smoke(tmp_path):
     assert len(manifest) == 4
     assert all((worker / row["path"]).is_file() for row in manifest)
     assert all((worker / row["training_state_path"]).is_file() for row in manifest)
+    run_manifest = json.loads(
+        (worker / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    assert run_manifest["replay_storage"] == REPLAY_STORAGE
 
     resumed = _run_task(
         task_index=0,
@@ -157,3 +177,114 @@ def test_smoke_configuration_retains_the_selected_mechanisms():
         member.target_average_window == 4
         for member in solver.q_value_trainer.members
     )
+
+
+def test_exp1_uses_float32_values_without_compact_replay_confounds():
+    solver = _make_solver(0, smoke_config())
+
+    reservoirs = [
+        *(trainer.buffer for trainer in solver.regret_trainers),
+        solver.ave_policy_trainer.buffer,
+    ]
+    for buffer in reservoirs:
+        assert buffer.infostate_buf.dtype == np.float32
+        assert buffer.q_value_buf.dtype == np.float32
+        assert buffer.q_value_mask_buf.dtype == np.float32
+        assert buffer.iteration_buf.dtype == np.float32
+        assert not hasattr(buffer, "rng")
+
+    for member in solver.q_value_trainer.members:
+        buffer = member.buffer
+        assert buffer.history_buf.dtype == np.float32
+        assert buffer.next_history_buf.dtype == np.float32
+        assert buffer.next_state_buf.dtype == np.float32
+        assert buffer.reward_buf.dtype == np.float32
+        assert buffer.action_buf.dtype == np.dtype(int)
+        assert buffer.next_legal_actions_mask_buf.dtype == np.dtype(int)
+        assert not hasattr(buffer, "rng")
+
+    assert solver.replay_storage_contract == REPLAY_STORAGE
+    assert solver.replay_storage_allocated_bytes == validate_replay_storage(solver)
+
+
+def test_shared_grouped_solver_factories_retain_legacy_defaults():
+    solver = GroupedWideUnbiasedControlVariateEscher(
+        **_solver_kwargs(0, smoke_config())
+    )
+    assert all(
+        type(trainer) is VRDCFRPlusRegretTrainer
+        for trainer in solver.regret_trainers
+    )
+    assert (
+        type(solver.ave_policy_trainer)
+        is GroupedSoftTargetCrossEntropyAvePolicyTrainer
+    )
+    assert all(
+        type(member) is TemporallyAveragedCrossFittedQMember
+        for member in solver.q_value_trainer.members
+    )
+    assert solver.ave_policy_trainer.buffer.infostate_buf.dtype == np.float64
+    assert solver.q_value_trainer.members[0].buffer.history_buf.dtype == np.float64
+
+
+def test_float32_storage_preserves_legacy_replacement_and_sampling_streams():
+    def filled_reservoir(buffer_type):
+        np.random.seed(719)
+        buffer = buffer_type(7, 4, 3)
+        for value in range(50):
+            buffer.add(
+                np.full(4, value),
+                np.full(3, value),
+                np.ones(3),
+                value,
+            )
+        return buffer
+
+    legacy = filled_reservoir(ReservoirBuffer)
+    revised = filled_reservoir(Float32LegacyReservoirBuffer)
+    for legacy_array, revised_array in zip(
+        (
+            legacy.infostate_buf,
+            legacy.q_value_buf,
+            legacy.q_value_mask_buf,
+            legacy.iteration_buf,
+        ),
+        (
+            revised.infostate_buf,
+            revised.q_value_buf,
+            revised.q_value_mask_buf,
+            revised.iteration_buf,
+        ),
+    ):
+        np.testing.assert_array_equal(legacy_array, revised_array)
+
+    random.seed(991)
+    legacy_sample = legacy.sample(5)
+    random.seed(991)
+    revised_sample = revised.sample(5)
+    for legacy_tensor, revised_tensor in zip(legacy_sample, revised_sample):
+        np.testing.assert_array_equal(legacy_tensor.numpy(), revised_tensor.numpy())
+
+    def filled_circular(buffer_type):
+        buffer = buffer_type(7, 8, 4, 3)
+        for value in range(12):
+            buffer.add(
+                np.full(8, value),
+                value % 3,
+                np.full(8, value + 1),
+                np.full(4, value),
+                np.ones(3),
+                value % 2,
+                value % 4 == 0,
+                value,
+            )
+        return buffer
+
+    legacy_circular = filled_circular(CircularBuffer)
+    revised_circular = filled_circular(Float32LegacyCircularBuffer)
+    random.seed(301)
+    legacy_sample = legacy_circular.sample(5)
+    random.seed(301)
+    revised_sample = revised_circular.sample(5)
+    for legacy_tensor, revised_tensor in zip(legacy_sample, revised_sample):
+        np.testing.assert_array_equal(legacy_tensor.numpy(), revised_tensor.numpy())

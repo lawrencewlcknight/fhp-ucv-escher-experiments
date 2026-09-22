@@ -37,6 +37,12 @@ runs one of seeds `0`, `1`, and `2` on its own on-demand `n2-standard-8` VM for
 24 effective training hours. Reloadable policies and resumable continuation
 states are uploaded at 6, 12, 18, and 24 hours.
 
+Experiment 1 stores continuous replay fields as `float32` but deliberately
+retains the raw OpenSpiel representation, full-width integer fields, legacy
+global-RNG sampling, network definitions, and all optimisation settings. This
+prevents checkpoint-time memory pressure without changing VM class or adopting
+the bundled structured/compact implementation tested by Experiment 2.
+
 After completing the one-time setup below, test locally:
 
 ```bash

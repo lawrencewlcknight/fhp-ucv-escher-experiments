@@ -59,6 +59,11 @@ The aggregate stage writes `analysis/seed_summaries.csv`,
 `analysis/checkpoint_index.csv`, and `analysis/experiment_manifest.json` only
 after all three seed workers validate successfully.
 
+The worker `run_manifest.json` and aggregate contract record the Experiment 1
+replay storage contract: `float32` continuous arrays, platform `int64` integer
+arrays, and legacy global-RNG sampling. Continuation states retain those array
+dtypes rather than widening values during serialization.
+
 ## Active Experiment 2 outputs
 
 `exp2_fhp_lossless_structured_ucv` uses the same three-worker, four-checkpoint

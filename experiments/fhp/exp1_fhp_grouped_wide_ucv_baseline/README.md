@@ -17,6 +17,13 @@ control-variate beta `1.0`, no instantaneous predictor, and residual
 calibration. Exact Leduc tree diagnostics and the paired legacy fit are not
 part of the FHP training algorithm.
 
+To fit this raw-input baseline on the same `n2-standard-8` VM class as the two
+structured experiments, all continuous replay fields use NumPy `float32`, the
+same precision consumed by the networks. Integer fields remain full-width and
+the legacy global NumPy/Python RNG calls, Algorithm-R replacement, minibatch
+selection, raw features, models, and optimiser settings are unchanged. The
+storage contract is recorded in every run manifest.
+
 ## Local smoke
 
 ```bash

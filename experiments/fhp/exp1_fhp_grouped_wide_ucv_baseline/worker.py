@@ -28,9 +28,6 @@ from fhp_escher.checkpointing import (
     sha256_file,
 )
 from fhp_escher.game import load_fhp_game, serialisable_game_definition
-from unbiased_escher.grouped_wide_solver import (
-    GroupedWideUnbiasedControlVariateEscher,
-)
 from vr_deep_cfr.logger import Logger
 
 from .config import (
@@ -40,8 +37,13 @@ from .config import (
     EXPERIMENT_NAME,
     PRODUCTION_SEEDS,
     REFERENCE_VM,
+    REPLAY_STORAGE,
     SMOKE_SEEDS,
     validate_contract,
+)
+from .float32_solver import (
+    Float32GroupedWideUnbiasedControlVariateEscher,
+    validate_replay_storage,
 )
 from .training_state import (
     build_training_state,
@@ -137,7 +139,7 @@ def _solver_kwargs(seed: int, config: Mapping) -> dict:
 
 
 def _make_solver(seed: int, config: Mapping):
-    solver = GroupedWideUnbiasedControlVariateEscher(
+    solver = Float32GroupedWideUnbiasedControlVariateEscher(
         **_solver_kwargs(seed, config)
     )
     solver.max_num_iterations = int(config["max_num_iterations"])
@@ -148,6 +150,11 @@ def _make_solver(seed: int, config: Mapping):
     )
     solver.target_nodes_touched = None
     solver.max_wall_clock_seconds = None
+    solver.replay_storage_allocated_bytes = validate_replay_storage(solver)
+    LOGGER.info(
+        "Experiment 1 allocated %.3f GiB of replay storage",
+        solver.replay_storage_allocated_bytes / (1024.0**3),
+    )
     return solver
 
 
@@ -316,6 +323,7 @@ def run_worker(
         "game": serialisable_game_definition(),
         "training_config": dict(config),
         "training_config_sha256": _config_sha256(config),
+        "replay_storage": dict(REPLAY_STORAGE),
         "reference_vm": dict(REFERENCE_VM),
         "repository_commit": commit,
         "started_utc": started.isoformat(),
@@ -466,6 +474,9 @@ def run_worker(
                 ordered[-1]["actual_training_elapsed_seconds"]
             ),
             "peak_rss_mib": _peak_rss_mib(),
+            "replay_storage_allocated_bytes": int(
+                solver.replay_storage_allocated_bytes
+            ),
             "reference_vm": dict(REFERENCE_VM),
             "final_policy_path": final_policy.name,
             "final_policy_sha256": sha256_file(final_policy),

@@ -98,6 +98,13 @@ REFERENCE_VM = {
     "boot_disk_type": "pd-balanced",
 }
 
+REPLAY_STORAGE = {
+    "continuous_dtype": "float32",
+    "integer_dtype": "int64",
+    "sampling": "legacy_global_rng",
+    "representation": "raw_openspiel_information_state",
+}
+
 
 def checkpoint_schedule(*, smoke: bool = False) -> tuple[dict, ...]:
     seconds = SMOKE_CHECKPOINT_SECONDS if smoke else CHECKPOINT_TRAINING_SECONDS
@@ -198,6 +205,7 @@ def contract_manifest() -> dict:
         "seed_execution": "parallel_gcp_batch_task_array_one_vm_per_seed",
         "checkpoint_boundary": "first_completed_outer_iteration_after_threshold",
         "training_config": dict(EXPERIMENT_35_CONFIG),
+        "replay_storage": dict(REPLAY_STORAGE),
         "source": "Leduc ESCHER architecture Experiment 35",
         "excluded_leduc_diagnostics": [
             "exact_tabular_exploitability",
@@ -219,6 +227,7 @@ __all__ = [
     "ITERATION_SAFETY_CAP",
     "PRODUCTION_SEEDS",
     "REFERENCE_VM",
+    "REPLAY_STORAGE",
     "SMOKE_SEEDS",
     "checkpoint_schedule",
     "contract_manifest",

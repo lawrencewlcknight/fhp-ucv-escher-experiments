@@ -12,6 +12,12 @@ training configuration from Leduc ESCHER architecture Experiment 35 to the
 canonical OpenSpiel FHP game. Seeds `0`, `1`, and `2` run concurrently on three
 independent GCP Batch VMs for 24 effective training hours each.
 
+Its continuous replay fields are stored as NumPy `float32`, matching the
+precision used by network training. The raw OpenSpiel representation, generic
+networks, full-width integer fields, legacy Algorithm-R replacement and
+minibatch RNG behaviour remain unchanged. This storage-only correction keeps
+the baseline on the same `n2-standard-8` VM class as Experiments 2 and 3.
+
 Every seed saves a reloadable policy and exact continuation state at the first
 completed outer iteration after 6, 12, 18, and 24 hours. The remote controller
 requires a successful cloud smoke before production, permits one automatic

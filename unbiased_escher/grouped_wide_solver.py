@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from vr_deep_cfr.solver import AvePolicyTrainer
+from vr_deep_cfr.variants import VRDCFRPlusRegretTrainer
 
 from .solver import (
     CrossFittedQEnsemble,
@@ -164,6 +165,8 @@ class TemporallyAveragedCrossFittedQMember(CrossFittedQMember):
 class TemporallyAveragedCrossFittedQEnsemble(CrossFittedQEnsemble):
     """Cross-fitted ensemble with temporal averaging inside every fold."""
 
+    member_class = TemporallyAveragedCrossFittedQMember
+
     def __init__(
         self,
         *,
@@ -188,7 +191,7 @@ class TemporallyAveragedCrossFittedQEnsemble(CrossFittedQEnsemble):
             raise ValueError("Ensemble size and target-average window must be positive")
         member_buffer_size = max(1, int(total_buffer_size) // self.ensemble_size)
         self.members = [
-            TemporallyAveragedCrossFittedQMember(
+            self.member_class(
                 history_size,
                 state_size,
                 action_size,
@@ -211,6 +214,10 @@ class TemporallyAveragedCrossFittedQEnsemble(CrossFittedQEnsemble):
 
 class GroupedWideUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
     """FHP UCV-ESCHER using the selected Leduc Experiment 35 configuration."""
+
+    nonpredictive_regret_trainer_class = VRDCFRPlusRegretTrainer
+    average_policy_trainer_class = GroupedSoftTargetCrossEntropyAvePolicyTrainer
+    q_ensemble_class = TemporallyAveragedCrossFittedQEnsemble
 
     def __init__(
         self,
@@ -276,6 +283,28 @@ class GroupedWideUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         if self.use_instantaneous_predictor:
             raise ValueError("Experiment 35 requires the non-predictive UCV core")
 
+    def init_regret_trainers(self):
+        if self.use_instantaneous_predictor:
+            return super().init_regret_trainers()
+        self.regret_trainers = [
+            self.nonpredictive_regret_trainer_class(
+                self.infostate_size,
+                self.action_size,
+                self.network_layers,
+                self.learning_rate,
+                self.advantage_buffer_size,
+                self.advantage_batch_size,
+                self.advantage_network_train_steps,
+                self.logger,
+                self.use_regret_matching_argmax,
+                self.device,
+                self.alpha,
+            )
+            for _ in range(self.num_players)
+        ]
+        for trainer in self.regret_trainers:
+            trainer.predictor_enabled = False
+
     def init_ave_policy_trainer(self):
         # Experiment 35 constructed its legacy 3x64 head first, then restored
         # that post-construction RNG state after creating the wider candidate.
@@ -301,7 +330,7 @@ class GroupedWideUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         }
         if torch.cuda.is_available():
             rng_after_legacy["cuda"] = torch.cuda.get_rng_state_all()
-        self.ave_policy_trainer = GroupedSoftTargetCrossEntropyAvePolicyTrainer(
+        self.ave_policy_trainer = self.average_policy_trainer_class(
             self.infostate_size,
             self.action_size,
             list(self.average_policy_network_layers),
@@ -328,7 +357,7 @@ class GroupedWideUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                 root_state.information_state_tensor(1),
             )
         )
-        self.q_value_trainer = TemporallyAveragedCrossFittedQEnsemble(
+        self.q_value_trainer = self.q_ensemble_class(
             target_average_window=self.critic_target_average_window,
             ensemble_size=self.q_ensemble_size,
             history_size=history_size,
