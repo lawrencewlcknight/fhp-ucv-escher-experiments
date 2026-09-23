@@ -12,6 +12,12 @@ if [[ "$ACTION" == "smoke-local" ]]; then
   exec python3 -m experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.run \
     smoke --output-root "$SMOKE_OUTPUT" --no-resume
 fi
+if [[ "$ACTION" == "checkpoint-smoke-local" ]]; then
+  SMOKE_OUTPUT="${SMOKE_OUTPUT:-/tmp/exp1-fhp-checkpoint-smoke}"
+  cd "$REPO_DIR"
+  exec python3 -m experiments.fhp.exp1_fhp_grouped_wide_ucv_baseline.run \
+    checkpoint-smoke --output-root "$SMOKE_OUTPUT"
+fi
 
 : "${PROJECT_ID:?Set PROJECT_ID}"
 : "${REGION:?Set REGION}"
@@ -184,7 +190,7 @@ case "$ACTION" in
     complete_or_retry "${RUN_ID}-aggregate" "$AGGREGATE_JOB" "$TEMP_DIR/aggregate.json"
     ;;
   *)
-    echo "Usage: $0 [run|resume|smoke-local|smoke-cloud|status|dry-run]" >&2
+    echo "Usage: $0 [run|resume|smoke-local|checkpoint-smoke-local|smoke-cloud|status|dry-run]" >&2
     exit 2
     ;;
 esac

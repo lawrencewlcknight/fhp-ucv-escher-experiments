@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
+import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -12,6 +17,11 @@ import torch
 
 SCHEMA_VERSION = 1
 STATE_TYPE = "exp1_fhp_grouped_wide_full_training_state"
+SHARDED_SCHEMA_VERSION = 1
+SHARDED_STATE_TYPE = "exp1_fhp_sharded_training_state"
+SHARDED_MANIFEST = "manifest.json"
+SHARDED_METADATA = "metadata.pt"
+_ARRAY_MARKER = "__exp1_numpy_shard__"
 
 
 def _cpu_state_dict(model) -> dict[str, torch.Tensor]:
@@ -214,6 +224,7 @@ def build_training_state(
 
 
 def save_training_state(path: Path, payload: Mapping[str, Any]) -> None:
+    """Write the legacy monolithic format used by FHP Experiments 2 and 3."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -222,7 +233,202 @@ def save_training_state(path: Path, payload: Mapping[str, Any]) -> None:
 
 
 def read_training_state(path: Path) -> dict[str, Any]:
+    """Read the legacy monolithic format used by FHP Experiments 2 and 3."""
     return torch.load(Path(path), map_location="cpu", weights_only=False)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _externalise_numpy_arrays(
+    value: Any,
+    *,
+    state_root: Path,
+    shards: list[dict[str, Any]],
+) -> Any:
+    """Replace NumPy arrays with independently streamed ``.npy`` shards."""
+    if isinstance(value, np.ndarray):
+        relative = Path("arrays") / f"array_{len(shards):04d}.npy"
+        destination = state_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        # Passing the real file handle lets NumPy stream contiguous replay
+        # views directly instead of constructing one multi-gigabyte pickle.
+        with open(destination, "wb") as handle:
+            np.save(handle, value, allow_pickle=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        record = {
+            "path": relative.as_posix(),
+            "dtype": str(value.dtype),
+            "shape": list(value.shape),
+            "size_bytes": int(destination.stat().st_size),
+            "sha256": _sha256_file(destination),
+        }
+        shards.append(record)
+        return {_ARRAY_MARKER: relative.as_posix()}
+    if isinstance(value, dict):
+        return {
+            key: _externalise_numpy_arrays(
+                item, state_root=state_root, shards=shards
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _externalise_numpy_arrays(item, state_root=state_root, shards=shards)
+            for item in value
+        ]
+    if isinstance(value, tuple):
+        return tuple(
+            _externalise_numpy_arrays(item, state_root=state_root, shards=shards)
+            for item in value
+        )
+    return value
+
+
+def _restore_numpy_arrays(value: Any, *, state_root: Path) -> Any:
+    if isinstance(value, dict) and set(value) == {_ARRAY_MARKER}:
+        shard = state_root / value[_ARRAY_MARKER]
+        return np.load(shard, mmap_mode="r", allow_pickle=False)
+    if isinstance(value, dict):
+        return {
+            key: _restore_numpy_arrays(item, state_root=state_root)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_restore_numpy_arrays(item, state_root=state_root) for item in value]
+    if isinstance(value, tuple):
+        return tuple(
+            _restore_numpy_arrays(item, state_root=state_root) for item in value
+        )
+    return value
+
+
+def save_sharded_training_state(path: Path, payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Atomically save a continuation state without a large pickle buffer.
+
+    Replay arrays are written one at a time as ``.npy`` files. The remaining
+    small PyTorch/Python metadata is saved separately, and ``manifest.json`` is
+    written last so incomplete directories are never considered resumable.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(
+        tempfile.mkdtemp(prefix=f".{path.name}.tmp-", dir=str(path.parent))
+    )
+    try:
+        shards: list[dict[str, Any]] = []
+        metadata = _externalise_numpy_arrays(
+            dict(payload), state_root=temporary, shards=shards
+        )
+        metadata_path = temporary / SHARDED_METADATA
+        metadata_temporary = metadata_path.with_suffix(".pt.tmp")
+        torch.save(metadata, metadata_temporary)
+        metadata_temporary.replace(metadata_path)
+        manifest = {
+            "schema_version": SHARDED_SCHEMA_VERSION,
+            "type": SHARDED_STATE_TYPE,
+            "payload_type": payload.get("type"),
+            "metadata_path": SHARDED_METADATA,
+            "metadata_size_bytes": int(metadata_path.stat().st_size),
+            "metadata_sha256": _sha256_file(metadata_path),
+            "array_shards": shards,
+            "complete": True,
+        }
+        manifest["total_size_bytes"] = int(
+            manifest["metadata_size_bytes"]
+            + sum(int(record["size_bytes"]) for record in shards)
+        )
+        manifest_path = temporary / SHARDED_MANIFEST
+        manifest_temporary = manifest_path.with_suffix(".json.tmp")
+        with open(manifest_temporary, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        manifest_temporary.replace(manifest_path)
+        if path.exists():
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        temporary.replace(path)
+        return training_state_storage_info(path, verify=True)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+
+
+def _read_sharded_manifest(path: Path, *, verify: bool) -> dict[str, Any]:
+    path = Path(path)
+    manifest_path = path / SHARDED_MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if (
+        manifest.get("type") != SHARDED_STATE_TYPE
+        or int(manifest.get("schema_version", -1)) != SHARDED_SCHEMA_VERSION
+        or manifest.get("complete") is not True
+    ):
+        raise ValueError(f"Incomplete or unsupported sharded state: {path}")
+    metadata_path = path / manifest["metadata_path"]
+    if not metadata_path.is_file():
+        raise FileNotFoundError(metadata_path)
+    records = list(manifest.get("array_shards", ()))
+    for record in records:
+        shard = path / record["path"]
+        if not shard.is_file():
+            raise FileNotFoundError(shard)
+    if verify:
+        if (
+            int(metadata_path.stat().st_size) != int(manifest["metadata_size_bytes"])
+            or _sha256_file(metadata_path) != manifest["metadata_sha256"]
+        ):
+            raise ValueError(f"Sharded-state metadata hash mismatch: {metadata_path}")
+        for record in records:
+            shard = path / record["path"]
+            if (
+                int(shard.stat().st_size) != int(record["size_bytes"])
+                or _sha256_file(shard) != record["sha256"]
+            ):
+                raise ValueError(f"Sharded-state array hash mismatch: {shard}")
+            array = np.load(shard, mmap_mode="r", allow_pickle=False)
+            if str(array.dtype) != record["dtype"] or list(array.shape) != list(
+                record["shape"]
+            ):
+                raise ValueError(f"Sharded-state array metadata mismatch: {shard}")
+    return manifest
+
+
+def training_state_storage_info(path: Path, *, verify: bool = False) -> dict[str, Any]:
+    path = Path(path)
+    if path.is_dir():
+        manifest = _read_sharded_manifest(path, verify=verify)
+        manifest_path = path / SHARDED_MANIFEST
+        return {
+            "format": "sharded_numpy_v1",
+            "sha256": _sha256_file(manifest_path),
+            "size_bytes": int(
+                manifest["total_size_bytes"] + manifest_path.stat().st_size
+            ),
+        }
+    return {
+        "format": "legacy_torch_v1",
+        "sha256": _sha256_file(path),
+        "size_bytes": int(path.stat().st_size),
+    }
+
+
+def read_sharded_training_state(path: Path, *, verify: bool = True) -> dict[str, Any]:
+    path = Path(path)
+    manifest = _read_sharded_manifest(path, verify=verify)
+    metadata = torch.load(
+        path / manifest["metadata_path"], map_location="cpu", weights_only=False
+    )
+    return _restore_numpy_arrays(metadata, state_root=path)
 
 
 def restore_training_state(
@@ -302,7 +508,10 @@ __all__ = [
     "SCHEMA_VERSION",
     "STATE_TYPE",
     "build_training_state",
+    "read_sharded_training_state",
     "read_training_state",
     "restore_training_state",
+    "save_sharded_training_state",
     "save_training_state",
+    "training_state_storage_info",
 ]

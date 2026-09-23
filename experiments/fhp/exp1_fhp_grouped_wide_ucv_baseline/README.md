@@ -10,6 +10,13 @@ policy plus a full continuation state at the first completed outer iteration
 after 6, 12, 18, and 24 hours. Checkpoint fitting, serialization, and upload
 are excluded from the effective-training clock.
 
+Playable policy checkpoints are uploaded before the larger continuation
+state is created. Continuation replay arrays are streamed to independent
+NumPy shards and committed by a final integrity manifest, avoiding the
+transient memory amplification of a multi-gigabyte `torch.save`. Only the
+latest continuation state is retained; all four lightweight playable policy
+checkpoints remain available for analysis.
+
 The transferred candidate uses grouped soft-target cross-entropy, a `3 x 136`
 average-policy network, learning rate `0.003`, 20,000 updates per fit, reset
 fitting, a two-fold critic, a four-fit averaged critic target, fixed
@@ -30,6 +37,14 @@ storage contract is recorded in every run manifest.
 ./gcp/run_exp1_grouped_wide.sh smoke-local
 ```
 
+The ordinary local smoke uses reduced buffers. A production-capacity
+serialization stress test is also available, but requires approximately the
+same memory and temporary disk space as a production worker:
+
+```bash
+./gcp/run_exp1_grouped_wide.sh checkpoint-smoke-local
+```
+
 ## GCP Batch
 
 ```bash
@@ -44,9 +59,11 @@ export PARALLELISM=3
 ./gcp/run_exp1_grouped_wide.sh run
 ```
 
-The remote controller runs cloud smoke first, submits the three-worker training
-array only after smoke succeeds, then validates and uploads aggregate metadata.
-The laptop may disconnect after controller submission.
+The remote controller first runs both the functional smoke and a
+production-capacity continuation-state serialization stress test. Synthetic
+stress data are deleted before upload. The controller submits the three-worker
+training array only after both checks succeed, then validates and uploads
+aggregate metadata. The laptop may disconnect after controller submission.
 
 ```bash
 ./gcp/run_exp1_grouped_wide.sh status

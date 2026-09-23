@@ -125,6 +125,13 @@ def test_batch_job_is_three_independent_retryable_standard_vms(tmp_path):
     assert "training_states/**" in script
     assert "EXP1_REMOTE_TASK_URI" in script
 
+    smoke_args = SimpleNamespace(**vars(args))
+    smoke_args.kind = "smoke"
+    smoke_script = builder.build_job(smoke_args)["taskGroups"][0]["taskSpec"][
+        "runnables"
+    ][0]["script"]["text"]
+    assert "checkpoint-smoke" in smoke_script
+
 
 @pytest.mark.smoke
 def test_four_checkpoint_policy_and_resume_smoke(tmp_path):
@@ -142,7 +149,13 @@ def test_four_checkpoint_policy_and_resume_smoke(tmp_path):
     )
     assert len(manifest) == 4
     assert all((worker / row["path"]).is_file() for row in manifest)
-    assert all((worker / row["training_state_path"]).is_file() for row in manifest)
+    continuation_rows = [row for row in manifest if row.get("training_state_path")]
+    assert len(continuation_rows) == 1
+    assert continuation_rows[0]["checkpoint_id"] == manifest[-1]["checkpoint_id"]
+    continuation = worker / continuation_rows[0]["training_state_path"]
+    assert continuation.is_dir()
+    assert (continuation / "manifest.json").is_file()
+    assert continuation_rows[0]["training_state_format"] == "sharded_numpy_v1"
     run_manifest = json.loads(
         (worker / "run_manifest.json").read_text(encoding="utf-8")
     )
@@ -159,7 +172,11 @@ def test_four_checkpoint_policy_and_resume_smoke(tmp_path):
     restored_manifest = json.loads(
         (worker / "checkpoint_manifest.json").read_text(encoding="utf-8")
     )
-    assert all(row.get("training_state_sha256") for row in restored_manifest)
+    restored_states = [
+        row for row in restored_manifest if row.get("training_state_sha256")
+    ]
+    assert len(restored_states) == 1
+    assert restored_states[0]["checkpoint_id"] == restored_manifest[-1]["checkpoint_id"]
 
 
 def test_smoke_configuration_retains_the_selected_mechanisms():

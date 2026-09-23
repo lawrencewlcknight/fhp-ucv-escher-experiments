@@ -136,7 +136,10 @@ def _script(args) -> str:
         return _controller_script(args)
     bootstrap = _bootstrap(args)
     if args.kind == "smoke":
-        action = f"python -m {MODULE} smoke --output-root \"$OUTPUT_ROOT\" --no-resume"
+        action = f"""
+python -m {MODULE} checkpoint-smoke --output-root "$OUTPUT_ROOT"
+python -m {MODULE} smoke --output-root "$OUTPUT_ROOT" --no-resume
+""".strip()
         wrapped = _diagnostic_wrapper(
             action,
             "$OUTPUT_ROOT/smoke_diagnostics",

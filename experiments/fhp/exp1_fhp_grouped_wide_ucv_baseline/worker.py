@@ -47,9 +47,11 @@ from .float32_solver import (
 )
 from .training_state import (
     build_training_state,
+    read_sharded_training_state,
     read_training_state,
     restore_training_state,
-    save_training_state,
+    save_sharded_training_state,
+    training_state_storage_info,
 )
 
 
@@ -159,15 +161,19 @@ def _make_solver(seed: int, config: Mapping):
 
 
 def _state_paths(worker_dir: Path, schedule: Sequence[Mapping], seed: int):
-    return [
-        worker_dir
-        / "training_states"
-        / f"{ALGORITHM_ID}_seed_{seed}_{row['checkpoint_id']}.pt"
-        for row in reversed(schedule)
-    ]
+    paths = []
+    for row in reversed(schedule):
+        stem = f"{ALGORITHM_ID}_seed_{seed}_{row['checkpoint_id']}"
+        paths.extend(
+            (
+                worker_dir / "training_states" / f"{stem}.state",
+                worker_dir / "training_states" / f"{stem}.pt",
+            )
+        )
+    return paths
 
 
-def _sync_remote(worker_dir: Path) -> None:
+def _sync_remote(worker_dir: Path, *, include_training_states: bool = True) -> None:
     remote = os.environ.get("EXP1_REMOTE_TASK_URI")
     if not remote:
         return
@@ -182,9 +188,10 @@ def _sync_remote(worker_dir: Path) -> None:
         "storage",
         "rsync",
         "--recursive",
-        str(worker_dir.resolve()),
-        remote.rstrip("/"),
     ]
+    if not include_training_states:
+        command.extend(("--exclude", r"(^|/)training_states(/|$)"))
+    command.extend((str(worker_dir.resolve()), remote.rstrip("/")))
     last_result = None
     for attempt in range(1, REMOTE_SYNC_ATTEMPTS + 1):
         last_result = subprocess.run(command, check=False)
@@ -205,6 +212,42 @@ def _sync_remote(worker_dir: Path) -> None:
     raise subprocess.CalledProcessError(last_result.returncode, command)
 
 
+def _remove_remote_training_states(relative_paths: Sequence[str]) -> None:
+    remote = os.environ.get("EXP1_REMOTE_TASK_URI")
+    if not remote:
+        return
+    for relative in relative_paths:
+        destination = f"{remote.rstrip('/')}/{relative.strip('/')}"
+        result = subprocess.run(
+            ["gcloud", "storage", "rm", "--recursive", destination],
+            check=False,
+        )
+        if result.returncode != 0:
+            LOGGER.warning("Could not remove superseded remote state: %s", destination)
+
+
+def _without_training_state_fields(records: Sequence[Mapping]) -> list[dict]:
+    stripped = []
+    for source in records:
+        row = dict(source)
+        for key in (
+            "training_state_path",
+            "training_state_sha256",
+            "training_state_size_bytes",
+            "training_state_format",
+        ):
+            row.pop(key, None)
+        stripped.append(row)
+    return stripped
+
+
+def _remove_local_state(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
 def _restore_latest(
     solver,
     *,
@@ -219,7 +262,7 @@ def _restore_latest(
     if manifest_path.is_file():
         manifest_rows = json.loads(manifest_path.read_text(encoding="utf-8"))
     for path in _state_paths(worker_dir, schedule, seed):
-        if not path.is_file():
+        if not path.exists():
             continue
         recorded = next(
             (
@@ -229,14 +272,31 @@ def _restore_latest(
             ),
             None,
         )
-        if recorded is not None and sha256_file(path) != recorded.get(
+        try:
+            storage = training_state_storage_info(path, verify=True)
+        except (FileNotFoundError, json.JSONDecodeError, OSError, RuntimeError, ValueError):
+            LOGGER.exception("Skipping incomplete continuation state: %s", path)
+            continue
+        if recorded is not None and storage["sha256"] != recorded.get(
             "training_state_sha256"
         ):
             LOGGER.warning("Skipping corrupt continuation state: %s", path)
             continue
         try:
-            payload = read_training_state(path)
-        except (EOFError, OSError, RuntimeError, pickle.UnpicklingError):
+            payload = (
+                read_sharded_training_state(path, verify=False)
+                if path.is_dir()
+                else read_training_state(path)
+            )
+        except (
+            EOFError,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+            RuntimeError,
+            ValueError,
+            pickle.UnpicklingError,
+        ):
             LOGGER.exception("Skipping unreadable continuation state: %s", path)
             continue
         captured = restore_training_state(
@@ -246,17 +306,20 @@ def _restore_latest(
             repository_commit=commit,
             config=config,
         )
+        state_checkpoint_id = (
+            str(recorded["checkpoint_id"])
+            if recorded is not None
+            else str(payload["checkpoint_id"])
+        )
         for record in captured:
             checkpoint = worker_dir / record["path"]
             if not checkpoint.is_file() or sha256_file(checkpoint) != record["sha256"]:
                 raise ValueError(f"Restored policy checkpoint is missing or corrupt: {checkpoint}")
-            state_path = worker_dir / "training_states" / (
-                f"{ALGORITHM_ID}_seed_{seed}_{record['checkpoint_id']}.pt"
-            )
-            if state_path.is_file():
-                record["training_state_path"] = str(state_path.relative_to(worker_dir))
-                record["training_state_sha256"] = sha256_file(state_path)
-                record["training_state_size_bytes"] = int(state_path.stat().st_size)
+            if str(record["checkpoint_id"]) == state_checkpoint_id:
+                record["training_state_path"] = str(path.relative_to(worker_dir))
+                record["training_state_sha256"] = storage["sha256"]
+                record["training_state_size_bytes"] = storage["size_bytes"]
+                record["training_state_format"] = storage["format"]
         LOGGER.info(
             "Resuming seed %s from %s at iteration %s and %.2f training hours",
             seed,
@@ -411,24 +474,46 @@ def run_worker(
         ]
         _write_incremental_manifests(worker_dir, ordered)
 
+        LOGGER.info("Uploading playable %s policy before continuation state", checkpoint_id)
+        _sync_remote(worker_dir, include_training_states=False)
+        LOGGER.info("Playable %s policy is durable in Cloud Storage", checkpoint_id)
+
         state_path = worker_dir / "training_states" / (
-            f"{ALGORITHM_ID}_seed_{seed}_{checkpoint_id}.pt"
+            f"{ALGORITHM_ID}_seed_{seed}_{checkpoint_id}.state"
         )
         record["training_state_path"] = str(state_path.relative_to(worker_dir))
+        LOGGER.info("Writing sharded continuation state for %s", checkpoint_id)
         state_payload = build_training_state(
             active_solver,
             seed=seed,
             checkpoint_id=checkpoint_id,
             repository_commit=commit,
             config=config,
-            captured_checkpoints=ordered,
+            captured_checkpoints=_without_training_state_fields(ordered),
         )
-        save_training_state(state_path, state_payload)
+        storage = save_sharded_training_state(state_path, state_payload)
         del state_payload
-        record["training_state_sha256"] = sha256_file(state_path)
-        record["training_state_size_bytes"] = int(state_path.stat().st_size)
+        record["training_state_sha256"] = storage["sha256"]
+        record["training_state_size_bytes"] = storage["size_bytes"]
+        record["training_state_format"] = storage["format"]
         _write_incremental_manifests(worker_dir, ordered)
         _sync_remote(worker_dir)
+        LOGGER.info("Sharded continuation state for %s is durable", checkpoint_id)
+
+        superseded_remote = []
+        for prior in ordered[:-1]:
+            relative = prior.pop("training_state_path", None)
+            prior.pop("training_state_sha256", None)
+            prior.pop("training_state_size_bytes", None)
+            prior.pop("training_state_format", None)
+            if relative:
+                prior_path = worker_dir / relative
+                _remove_local_state(prior_path)
+                superseded_remote.append(relative)
+        if superseded_remote:
+            _remove_remote_training_states(superseded_remote)
+            _write_incremental_manifests(worker_dir, ordered)
+            _sync_remote(worker_dir, include_training_states=False)
         LOGGER.info(
             "Saved %s for seed %s at iteration %s and %.2f training hours",
             checkpoint_id,

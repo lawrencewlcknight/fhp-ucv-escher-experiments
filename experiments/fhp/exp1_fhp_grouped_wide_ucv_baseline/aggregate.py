@@ -17,6 +17,7 @@ from .config import (
     PRODUCTION_SEEDS,
     contract_manifest,
 )
+from .training_state import training_state_storage_info
 
 
 def _write_json(path: Path, payload) -> None:
@@ -71,16 +72,28 @@ def aggregate_workers(
             raise ValueError(f"Invalid worker summary: {summary_path}")
         if len(rows) != 4:
             raise ValueError(f"Worker {seed} does not contain four checkpoints")
+        continuation_rows = [row for row in rows if row.get("training_state_path")]
+        if (
+            len(continuation_rows) != 1
+            or continuation_rows[0].get("checkpoint_id")
+            != rows[-1].get("checkpoint_id")
+        ):
+            raise ValueError(
+                f"Worker {seed} must retain only its latest continuation state"
+            )
         for row in rows:
             checkpoint = worker_dir / row["path"]
-            state = worker_dir / row["training_state_path"]
             if sha256_file(checkpoint) != row["sha256"]:
                 raise ValueError(f"Policy hash mismatch: {checkpoint}")
             # Cloud aggregation deliberately omits multi-gigabyte continuation
             # states. Verify them when present in a full local download; their
             # declared digest remains in the consolidated index either way.
-            if state.is_file() and sha256_file(state) != row["training_state_sha256"]:
-                raise ValueError(f"Training-state hash mismatch: {state}")
+            if row.get("training_state_path"):
+                state = worker_dir / row["training_state_path"]
+                if state.exists():
+                    storage = training_state_storage_info(state, verify=True)
+                    if storage["sha256"] != row["training_state_sha256"]:
+                        raise ValueError(f"Training-state hash mismatch: {state}")
             checkpoints.append(
                 {
                     "seed": int(seed),
