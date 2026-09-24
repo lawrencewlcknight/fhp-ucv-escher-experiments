@@ -10,6 +10,7 @@ import shlex
 
 
 REPO_URL = "https://github.com/lawrencewlcknight/fhp-ucv-escher-experiments.git"
+MAX_RUN_DURATION_SECONDS = 18 * 60 * 60
 
 
 def _q(value) -> str:
@@ -127,7 +128,7 @@ def build_job(args) -> dict:
                     "runnables": [{"script": {"text": _script(args)}}],
                     "computeResource": {"cpuMilli": 8_000, "memoryMib": 30_000},
                     "maxRetryCount": 0,
-                    "maxRunDuration": "32400s",
+                    "maxRunDuration": f"{MAX_RUN_DURATION_SECONDS}s",
                 },
                 "taskCount": 1,
                 "parallelism": 1,

@@ -20,4 +20,7 @@ use the three independent training-seed means as the inferential sample.
 
 The GCP launcher uses one `n2-standard-8` VM and eight worker processes. A
 small real-checkpoint smoke test runs on the cloud VM immediately before the
-production analysis.
+production analysis. The production workload has an 18-hour hard Batch
+ceiling; the observed evaluation throughput suggests an ordinary completion
+time of approximately 12 hours, and the VM stops as soon as the analysis
+finishes.

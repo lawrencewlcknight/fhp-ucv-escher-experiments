@@ -152,6 +152,7 @@ def test_batch_job_is_one_standard_n2_vm_with_cloud_smoke():
     group = job["taskGroups"][0]
     assert group["taskCount"] == 1
     assert group["parallelism"] == 1
+    assert group["taskSpec"]["maxRunDuration"] == "64800s"
     policy = job["allocationPolicy"]["instances"][0]["policy"]
     assert policy["machineType"] == "n2-standard-8"
     assert policy["provisioningModel"] == "STANDARD"

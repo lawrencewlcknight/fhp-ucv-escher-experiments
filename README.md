@@ -134,6 +134,9 @@ four checkpoints against the five rule agents and LBR, performs temporal and
 direct cross-play, and creates seed-level tables and charts. Training-state
 files are explicitly excluded from the cloud download. A small real-checkpoint
 smoke test must succeed on the VM before the production evaluation begins.
+The job has an 18-hour safety ceiling, while its observed production runtime
+is approximately 12 hours; the VM terminates immediately when the analysis
+finishes.
 
 Set the two immutable source runs and a new append-only evaluation run ID:
 
