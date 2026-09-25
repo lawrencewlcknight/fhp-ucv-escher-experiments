@@ -173,6 +173,43 @@ gcloud storage cp --recursive \
 
 See the [retrospective evaluation protocol](experiments/fhp/retrospective_exp2_exp3_evaluation/README.md).
 
+### Directly comparable evaluation of Experiments 1, 2 and 3
+
+After Experiment 1 has completed, extend the frozen Experiment 2/3 evaluation
+without repeating its expensive LBR analysis. The runner verifies the source
+checkpoint hashes and reference protocol, evaluates Experiment 1 identically,
+adds Experiment 1 versus 2 and Experiment 1 versus 3 cross-play, and produces
+unified tables and charts for all three experiments.
+
+```bash
+export EXP1_RUN_ID="exp1-fhp-20260923-233627"
+export EXP2_RUN_ID="exp2-fhp-20260921-093839"
+export EXP3_RUN_ID="exp3-fhp-20260921-093839"
+export EXP23_EVAL_RUN_ID="fhp-eval23-20260924-120059"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="fhp-eval123-$(date -u '+%Y%m%d-%H%M%S')"
+
+./gcp/run_retrospective_exp1_exp2_exp3_evaluation.sh run
+```
+
+The job uses one `n2-standard-8` VM and runs independently after Batch accepts
+it. Monitor it with the same variables:
+
+```bash
+./gcp/run_retrospective_exp1_exp2_exp3_evaluation.sh status
+```
+
+Download the compact completed analysis with:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID"
+gcloud storage cp --recursive \
+  "$BUCKET/$RUN_ID/analysis" \
+  "cloud_outputs/$RUN_ID/"
+```
+
+See the [three-experiment evaluation protocol](experiments/fhp/retrospective_exp1_exp2_exp3_evaluation/README.md).
+
 After archived Experiments 1--4 have been evaluated with the same configuration,
 build the common-deal 6-hour and 12-hour cross-play matrices with:
 
