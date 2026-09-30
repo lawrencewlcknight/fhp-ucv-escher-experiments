@@ -839,6 +839,40 @@ class ReservoirBuffer:
         self.q_value_mask_buf[idx] = q_value_mask
         self.iteration_buf[idx] = iteration
 
+    def add_batch(self, payload):
+        """Batch writes, retaining the scalar Algorithm-R RNG stream exactly.
+
+        Draws must NOT be replaced with a vectorised randint: this reservoir
+        shares NumPy's global RNG with traversal. Colliding slots retain the
+        final stream item, just as repeated calls to add do.
+        """
+        count = len(payload["iterations"])
+        if not count:
+            return
+        direct = min(count, max(0, self.buffer_size - self.cur_id))
+        fields = (
+            (self.infostate_buf, payload["infostates"]),
+            (self.q_value_buf, payload["values"]),
+            (self.q_value_mask_buf, payload["legal_masks"]),
+            (self.iteration_buf, payload["iterations"]),
+        )
+        for target, source in fields:
+            target[self.cur_id:self.cur_id + direct] = source[:direct]
+        source_indices, target_indices = [], []
+        for offset in range(direct, count):
+            idx = np.random.randint(low=0, high=self.cur_id + offset + 1)
+            if idx < self.buffer_size:
+                source_indices.append(offset)
+                target_indices.append(idx)
+        if target_indices:
+            targets = np.asarray(target_indices, dtype=np.int64)
+            _, reverse_first = np.unique(targets[::-1], return_index=True)
+            last = len(targets) - 1 - reverse_first
+            sources = np.asarray(source_indices, dtype=np.int64)[last]
+            for target, source in fields:
+                target[targets[last]] = source[sources]
+        self.cur_id += count
+
     def sample(self, num_samples=-1):
         self.data_length = min(self.cur_id, self.buffer_size)
         if num_samples > self.data_length:

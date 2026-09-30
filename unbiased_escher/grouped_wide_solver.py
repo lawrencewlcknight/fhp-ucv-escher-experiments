@@ -54,8 +54,8 @@ class GroupedSoftTargetCrossEntropyAvePolicyTrainer(AvePolicyTrainer):
             self.gamma,
             dtype=np.float64,
         )
-        unique, inverse, counts = np.unique(
-            features, axis=0, return_inverse=True, return_counts=True
+        unique, first, inverse = np.unique(
+            features, axis=0, return_index=True, return_inverse=True
         )
         masses = np.zeros(len(unique), dtype=np.float64)
         numerators = np.zeros((len(unique), policies.shape[1]), dtype=np.float64)
@@ -65,11 +65,12 @@ class GroupedSoftTargetCrossEntropyAvePolicyTrainer(AvePolicyTrainer):
             raise ValueError("Grouped average-policy target has non-positive mass")
         targets = numerators / masses[:, None]
 
-        order = np.argsort(inverse, kind="stable")
-        first = np.concatenate(([0], np.cumsum(counts[:-1], dtype=np.int64)))
-        grouped_masks = masks[order[first]]
-        for row_index, group_index in enumerate(inverse):
-            if not np.array_equal(masks[row_index], grouped_masks[group_index]):
+        grouped_masks = masks[first]
+        # Bound temporary memory and avoid one Python comparison per replay row.
+        # Target summation above deliberately retains the original row order.
+        for start in range(0, size, 65_536):
+            stop = min(start + 65_536, size)
+            if not np.all(masks[start:stop] == grouped_masks[inverse[start:stop]]):
                 raise ValueError(
                     "Legal-action masks differ within an information set"
                 )
@@ -91,24 +92,29 @@ class GroupedSoftTargetCrossEntropyAvePolicyTrainer(AvePolicyTrainer):
     def train_model(self, iteration):
         features, targets, masks, weights = self._grouped_training_data(iteration)
         size = len(features)
+        full_batch = self.batch_size == -1 or self.batch_size >= size
         loss = None
         for train_step in range(self.train_steps):
-            if self.batch_size == -1 or self.batch_size >= size:
-                indices = torch.arange(size, device=self.device)
+            if full_batch:
+                selected_features, selected_targets = features, targets
+                selected_masks, selected_weights = masks, weights
             else:
                 indices = torch.as_tensor(
                     random.sample(range(size), int(self.batch_size)),
                     dtype=torch.long,
                     device=self.device,
                 )
-            logits = self.model(features.index_select(0, indices))
-            selected_masks = masks.index_select(0, indices)
+                selected_features = features.index_select(0, indices)
+                selected_targets = targets.index_select(0, indices)
+                selected_masks = masks.index_select(0, indices)
+                selected_weights = weights.index_select(0, indices)
+            logits = self.model(selected_features)
             logits = logits.masked_fill(selected_masks != 1, -1e20)
             per_sample = -(
-                targets.index_select(0, indices)
+                selected_targets
                 * torch.log_softmax(logits, dim=-1)
             ).sum(dim=1)
-            loss = torch.mean(per_sample * weights.index_select(0, indices))
+            loss = torch.mean(per_sample * selected_weights)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()

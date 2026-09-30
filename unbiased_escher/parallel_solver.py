@@ -90,16 +90,17 @@ def _append_circular(buffer, payload: Mapping[str, np.ndarray]) -> None:
     count = min(original_count, capacity)
     start = original_count - count
     write_start = (int(buffer.cur_id) + start) % capacity
-    indices = (write_start + np.arange(count)) % capacity
-    source = slice(start, start + count)
-    buffer.history_buf[indices] = payload["histories"][source]
-    buffer.action_buf[indices] = payload["actions"][source]
-    buffer.next_history_buf[indices] = payload["next_histories"][source]
-    buffer.next_state_buf[indices] = payload["next_states"][source]
-    buffer.next_legal_actions_mask_buf[indices] = payload["next_legal_masks"][source]
-    buffer.next_player_buf[indices] = payload["next_players"][source]
-    buffer.done_buf[indices] = payload["dones"][source]
-    buffer.reward_buf[indices] = payload["rewards"][source]
+    fields = (
+        (buffer.history_buf, payload["histories"]),
+        (buffer.action_buf, payload["actions"]),
+        (buffer.next_history_buf, payload["next_histories"]),
+        (buffer.next_state_buf, payload["next_states"]),
+        (buffer.next_legal_actions_mask_buf, payload["next_legal_masks"]),
+        (buffer.next_player_buf, payload["next_players"]),
+        (buffer.done_buf, payload["dones"]),
+        (buffer.reward_buf, payload["rewards"]),
+    )
+    _write_ring_slices(fields, write_start, start, count, capacity)
     buffer.cur_id = (int(buffer.cur_id) + original_count) % capacity
     buffer.size = min(int(buffer.size) + original_count, capacity)
 
@@ -112,12 +113,25 @@ def _append_calibration(buffer, payload: Mapping[str, np.ndarray]) -> None:
     count = min(original_count, capacity)
     start = original_count - count
     write_start = (int(buffer.cursor) + start) % capacity
-    indices = (write_start + np.arange(count)) % capacity
-    source = slice(start, start + count)
-    buffer.features[indices] = payload["features"][source]
-    buffer.targets[indices] = payload["targets"][source]
+    _write_ring_slices(
+        ((buffer.features, payload["features"]), (buffer.targets, payload["targets"])),
+        write_start, start, count, capacity,
+    )
     buffer.cursor = (int(buffer.cursor) + original_count) % capacity
     buffer.size = min(int(buffer.size) + original_count, capacity)
+
+
+def _write_ring_slices(fields, write_start, source_start, count, capacity):
+    """At most two contiguous writes; no modulo-index array or scatter."""
+    first_count = min(count, capacity - write_start)
+    for target, source in fields:
+        target[write_start:write_start + first_count] = source[
+            source_start:source_start + first_count
+        ]
+        if first_count < count:
+            target[:count - first_count] = source[
+                source_start + first_count:source_start + count
+            ]
 
 
 class UCVEscherTraversalWorker:
@@ -355,7 +369,7 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         parallel_learner_threads: int | None = None,
         parallel_learner_intraop_threads: int | None = None,
         parallel_collection_chunk_size: int = DEFAULT_COLLECTION_CHUNK_SIZE,
-        parallel_cache_actor_snapshots: bool = False,
+        parallel_cache_actor_snapshots: bool = True,
         **solver_kwargs,
     ):
         self._parallel_num_workers = int(parallel_num_workers)
@@ -657,8 +671,7 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                 )
                 remaining -= collected
                 first_dispatch = False
-                self._maybe_run_early_node_checkpoint()
-                self._maybe_run_training_time_checkpoint()
+                self._after_collection_chunk()
                 if self._stop_requested:
                     break
         finally:
@@ -667,11 +680,31 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
                 self, "_cumulative_experience_collection_seconds", 0.0
             ) + (time.perf_counter() - collection_start)
 
+    def _after_collection_chunk(self):
+        self._maybe_run_early_node_checkpoint()
+        self._maybe_run_training_time_checkpoint()
+
     def _train_independent_control_learners(self):
         """Train disjoint Q folds and calibration concurrently on the driver."""
         calibration = self.calibration_trainer
         task_count = len(self.q_value_trainer.members) + (calibration is not None)
-        if not self._parallelize_independent_learners or task_count <= 1:
+        # Legacy replay samples Python's global RNG. Thread scheduling would
+        # assign random draws to different learners, breaking reproducibility.
+        # Only independently seeded replay generators permit concurrent fits.
+        learners = [*self.q_value_trainer.members]
+        if calibration is not None:
+            learners.append(calibration)
+        generators = [getattr(learner.buffer, "rng", None) for learner in learners]
+        independent_rngs = (
+            all(isinstance(rng, np.random.Generator) for rng in generators)
+            and len({id(rng) for rng in generators}) == len(generators)
+        )
+        if (
+            not self._parallelize_independent_learners
+            or task_count <= 1
+            or not independent_rngs
+        ):
+            self._effective_parallel_learner_threads = 1
             calibration_loss = (
                 calibration.train_model() if calibration is not None else None
             )

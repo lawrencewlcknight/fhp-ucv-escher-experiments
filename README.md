@@ -5,6 +5,15 @@
 > job names contain `archived`. New research experiments should reuse useful
 > components without modifying these archived definitions.
 
+## Parallel implementation review
+
+The [parallel efficiency review](docs/PARALLEL_EFFICIENCY_REVIEW.md) documents
+tested replay, preprocessing and snapshot-cache optimisations, plus parallel
+adapters for the selected grouped-policy configurations used by active
+Experiments 1–3. It includes equivalence tests and reproducible local
+microbenchmarks. Existing experiment launchers remain unchanged; the adapters
+require actor-aware resume integration before a new long-running GCP study.
+
 ## Active Experiment 1: grouped-wide FHP baseline
 
 The active baseline is `exp1_fhp_grouped_wide_ucv_baseline`. It ports the best

@@ -20,3 +20,11 @@ The bounded dispatches allow the inherited archived Experiment 1 training-time m
 to save at the first safe merge boundary after 6 and 12 hours and to stop after
 the final checkpoint. They do not introduce asynchronous gradients or multiply
 the configured traversal budget.
+
+The September 2026 [efficiency review](../docs/PARALLEL_EFFICIENCY_REVIEW.md)
+adds `grouped_parallel_solver.py` adapters for the active grouped-policy
+architectures. These use matching driver/worker solvers and completed-iteration
+time checkpoints. The shared backend now caches frozen snapshots by default
+and only fits independent learners concurrently when they own distinct replay
+generators; legacy shared-RNG learners retain sequential fitting. Archived
+experiment definitions and active production launchers are unchanged.

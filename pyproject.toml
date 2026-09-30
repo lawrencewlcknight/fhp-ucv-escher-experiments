@@ -28,7 +28,10 @@ exclude = ["outputs*", "tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["smoke: end-to-end smoke tests"]
+markers = [
+  "smoke: end-to-end smoke tests",
+  "ray: real local Ray actor integration tests",
+]
 
 [tool.ruff]
 line-length = 100

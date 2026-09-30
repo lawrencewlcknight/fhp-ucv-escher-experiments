@@ -379,18 +379,19 @@ class ResidualCalibrationTrainer:
         disagreement,
         player: int,
     ):
-        features = np.stack(
-            [
-                self.feature(
-                    infostate,
-                    action,
-                    iteration,
-                    float(disagreement[action]),
-                    player,
-                )
-                for action in range(self.action_size)
-            ]
+        # Broadcast the common state once instead of allocating/concatenating
+        # it separately for each action. Keep math.log1p and float32 conversion
+        # identical to feature(), including the disagreement clipping.
+        features = np.empty((self.action_size, self.feature_size), dtype=np.float32)
+        features[:, :self.infostate_size] = np.asarray(infostate, dtype=np.float32)
+        features[:, self.infostate_size:self.infostate_size + self.action_size] = (
+            np.eye(self.action_size, dtype=np.float32)
         )
+        features[:, -3] = math.log1p(max(int(iteration), 0)) / math.log(101.0)
+        features[:, -2] = [
+            math.log1p(max(float(value), 0.0)) for value in disagreement
+        ]
+        features[:, -1] = float(player)
         with torch.no_grad():
             outputs = self.target_model(
                 torch.as_tensor(features, dtype=torch.float32, device=self.device)
