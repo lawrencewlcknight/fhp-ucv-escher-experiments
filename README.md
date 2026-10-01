@@ -522,6 +522,34 @@ the comparison is conditional showdown strength, not a fold outcome. Policy
 quality needs the same separate rule-agent/LBR/cross-play evaluation as
 Experiment 9. See the [complete protocol](experiments/fhp/exp12_fhp_critic_showdown/README.md).
 
+## Active Experiment 13: frozen-reservoir policy-capacity audit
+
+Reuses Experiment 2's **three final 24-hour policy reservoirs**, not new regret
+training. It compares only the Experiment 2 and Experiment 3 output networks
+(74,243 versus 133,731 parameters), with two reset fitting replicas per source
+and matched **20k/60k** budgets. A separate four-recipe optimisation screen uses
+group-disjoint **80/10/10** train/validation/test partitions. One recipe per
+architecture is locked across all sources before test access and full-replay
+refits. Both fixed and tuned policies receive rule-agent, restricted LBR and
+matched head-to-head evaluation; exact exploitability is not available.
+
+The remote workflow is smoke, three parallel screens, global selection, three
+parallel refit/evaluation workers, then aggregation. Each source worker uses
+`n2-standard-8`; peak array allocation is **24 N2 vCPUs**. Only playable
+policies, analysis/evaluation and metadata are retained, not replay/full states.
+After committing and pushing:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP2_RUN_ID="exp2-fhp-20260921-093839"
+export RUN_ID="exp13-capacity-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+./gcp/run_exp13_policy_capacity.sh run
+```
+
+See the [Experiment 13 protocol](experiments/fhp/exp13_fhp_policy_capacity/README.md)
+for selection rules, limitations, cloud resumption and analysis-only downloads.
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
