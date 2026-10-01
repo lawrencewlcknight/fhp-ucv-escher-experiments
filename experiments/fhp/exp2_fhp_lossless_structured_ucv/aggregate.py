@@ -56,6 +56,7 @@ def aggregate_workers(
     algorithm_id: str = ALGORITHM_ID,
     contract_manifest_fn=contract_manifest,
     experiment_label: str = "Experiment 2",
+    expected_checkpoint_count: int = 4,
 ) -> Path:
     output_root = Path(output_root).resolve()
     workers_root = output_root / "workers"
@@ -80,18 +81,19 @@ def aggregate_workers(
         if (
             summary.get("status") != "complete"
             or int(summary.get("seed", -1)) != int(seed)
-            or int(summary.get("checkpoint_count", -1)) != 4
+            or int(summary.get("checkpoint_count", -1)) != expected_checkpoint_count
         ):
             raise ValueError(f"Invalid worker summary: {summary_path}")
-        if len(rows) != 4:
-            raise ValueError(f"Worker {seed} does not contain four checkpoints")
+        if len(rows) != expected_checkpoint_count:
+            raise ValueError(f"Worker {seed} does not contain {expected_checkpoint_count} checkpoints")
         for row in rows:
             checkpoint = worker_dir / row["path"]
-            state = worker_dir / row["training_state_path"]
             if sha256_file(checkpoint) != row["sha256"]:
                 raise ValueError(f"Policy hash mismatch: {checkpoint}")
-            if state.is_file() and sha256_file(state) != row["training_state_sha256"]:
-                raise ValueError(f"Training-state hash mismatch: {state}")
+            if "training_state_path" in row:
+                state = worker_dir / row["training_state_path"]
+                if state.is_file() and sha256_file(state) != row["training_state_sha256"]:
+                    raise ValueError(f"Training-state hash mismatch: {state}")
             checkpoints.append({"seed": int(seed), "worker": worker_dir.name, **dict(row)})
         summaries.append(summary)
         worker_artifacts.append(

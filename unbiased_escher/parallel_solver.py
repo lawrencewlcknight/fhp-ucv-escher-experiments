@@ -13,6 +13,9 @@ import math
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+import resource
+import sys
 from typing import Any, Iterable, Mapping
 
 import numpy as np
@@ -186,6 +189,7 @@ class UCVEscherTraversalWorker:
             }
         )
         self._max_traversals = max_traversals
+        self._worker_seed_value = int(worker_seed_value)
         self._loaded_snapshot_token = None
         self._solver = self.SOLVER_CLASS(**kwargs)
         self._solver.regret_trainers[1].buffer = (
@@ -196,6 +200,45 @@ class UCVEscherTraversalWorker:
 
     def ping(self) -> bool:
         return True
+
+    def continuation_state(self) -> dict:
+        """Quiescent actor state; scratch rows are rebuilt on the next request."""
+        solver = self._solver
+        return {
+            "seed": self._worker_seed_value,
+            "rng": deepcopy(solver._capture_rng_state()),
+            "nodes_touched": int(solver.nodes_touched),
+            "episode": int(solver.episode),
+            "replay_rng": [
+                deepcopy(buffer.rng.bit_generator.state)
+                if isinstance(getattr(buffer, "rng", None), np.random.Generator) else None
+                for buffer in [solver.ave_policy_trainer.buffer,
+                               *(member.buffer for member in solver.q_value_trainer.members)]
+            ],
+        }
+
+    def restore_continuation_state(self, state: Mapping) -> bool:
+        if state["seed"] != self._worker_seed_value:
+            raise ValueError("Traversal actor seed differs from saved state")
+        solver = self._solver
+        buffers = [solver.ave_policy_trainer.buffer,
+                   *(member.buffer for member in solver.q_value_trainer.members)]
+        if len(state["replay_rng"]) != len(buffers):
+            raise ValueError("Traversal actor replay RNG count differs")
+        for buffer, rng_state in zip(buffers, state["replay_rng"]):
+            if rng_state is not None:
+                buffer.rng.bit_generator.state = deepcopy(rng_state)
+        solver._restore_rng_state(state["rng"])
+        solver.nodes_touched = int(state["nodes_touched"])
+        solver.episode = int(state["episode"])
+        # The next traverser phase must load the restored driver's frozen models.
+        self._loaded_snapshot_token = None
+        return True
+
+    def resource_summary(self) -> dict:
+        rss = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+        return {"peak_rss_mib": rss / (1024**2 if sys.platform == "darwin" else 1024),
+                "torch_threads": torch.get_num_threads()}
 
     def _compact_collection_storage(self) -> None:
         """Use transfer-efficient dtypes for worker-only scratch replay."""

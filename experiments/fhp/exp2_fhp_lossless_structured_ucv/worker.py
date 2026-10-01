@@ -182,6 +182,7 @@ def _sync_remote(
         "storage",
         "rsync",
         "--recursive",
+        "--exclude", r"(^|/)(continuation_inputs|[^/]+\.tmp)(/|$)",
         str(worker_dir.resolve()),
         remote.rstrip("/"),
     ]
@@ -216,14 +217,18 @@ def _restore_latest(
     algorithm_id: str = ALGORITHM_ID,
     read_training_state_fn=read_training_state,
     restore_training_state_fn=restore_training_state,
+    initial_resume_state: Path | None = None,
 ) -> list[dict]:
     manifest_rows = []
     manifest_path = worker_dir / "checkpoint_manifest.json"
     if manifest_path.is_file():
         manifest_rows = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for path in _state_paths(
+    paths = _state_paths(
         worker_dir, schedule, seed, algorithm_id=algorithm_id
-    ):
+    )
+    if initial_resume_state is not None:
+        paths.append(initial_resume_state)
+    for path in paths:
         if not path.is_file():
             continue
         recorded = next(
@@ -262,6 +267,12 @@ def _restore_latest(
                 record["training_state_path"] = str(state_path.relative_to(worker_dir))
                 record["training_state_sha256"] = sha256_file(state_path)
                 record["training_state_size_bytes"] = int(state_path.stat().st_size)
+            else:
+                # Imported policies are retained, but their source full state
+                # is an input, not an output of this continuation run.
+                for key in tuple(record):
+                    if key.startswith("training_state_"):
+                        record.pop(key)
         LOGGER.info(
             "Resuming seed %s from %s at iteration %s and %.2f training hours",
             seed,
@@ -312,7 +323,15 @@ def run_worker(
     training_state_saver=save_training_state,
     remote_task_env: str = "EXP2_REMOTE_TASK_URI",
     experiment_label: str = "Experiment 2",
+    solver_factory=_make_solver,
+    execution_backend: str = "sequential_seed_worker",
+    extra_diagnostics_fn=None,
+    require_resume_state: bool = False,
+    training_state_retention: str = "all",
+    initial_resume_state: Path | None = None,
 ) -> dict:
+    if training_state_retention not in ("all", "none", "final"):
+        raise ValueError("Unknown training-state retention policy")
     worker_dir = Path(worker_dir).resolve()
     worker_dir.mkdir(parents=True, exist_ok=True)
     contract_seeds = smoke_seeds if smoke else production_seeds
@@ -329,7 +348,7 @@ def run_worker(
         "experiment_name": experiment_name,
         "algorithm_id": algorithm_id,
         "algorithm_label": algorithm_label,
-        "execution_backend": "sequential_seed_worker",
+        "execution_backend": execution_backend,
         "seed": int(seed),
         "smoke": bool(smoke),
         "checkpoint_schedule": [dict(row) for row in schedule],
@@ -346,17 +365,47 @@ def run_worker(
         "reference_vm": dict(reference_vm),
         "repository_commit": commit,
         "started_utc": started.isoformat(),
+        "training_state_retention": training_state_retention,
     }
     manifest_path = worker_dir / "run_manifest.json"
-    if manifest_path.is_file() and resume:
+    prior_exists = manifest_path.is_file()
+    if prior_exists and training_state_retention != "all" and not resume:
+        raise ValueError("Refusing to overwrite an existing run; use a new RUN_ID")
+    if prior_exists and resume:
         prior = json.loads(manifest_path.read_text(encoding="utf-8"))
         for key in ("seed", "training_config_sha256", "repository_commit"):
             if prior.get(key) != manifest.get(key):
                 raise ValueError(f"Existing run manifest differs at {key}")
         manifest["started_utc"] = prior["started_utc"]
+        if training_state_retention != "all":
+            for key in ("experiment_id", "algorithm_id", "checkpoint_schedule", "training_state_retention"):
+                if prior.get(key) != manifest.get(key):
+                    raise ValueError(f"Existing run manifest differs at {key}; use a new RUN_ID")
+    if training_state_retention != "all" and prior_exists:
+        if training_state_retention == "none" and (worker_dir / "SUCCESS.json").is_file():
+            success = json.loads((worker_dir / "SUCCESS.json").read_text())
+            summary = json.loads((worker_dir / "summary.json").read_text())
+            rows = json.loads((worker_dir / "checkpoint_manifest.json").read_text())
+            if (success.get("status") != "complete" or summary.get("status") != "complete"
+                    or success.get("summary_sha256") != sha256_file(worker_dir / "summary.json")
+                    or [r["checkpoint_id"] for r in rows] != [r["checkpoint_id"] for r in schedule]
+                    or success.get("checkpoints") != rows):
+                raise ValueError("Completed output metadata is incomplete or corrupt")
+            for row in rows:
+                if sha256_file(worker_dir / row["path"]) != row["sha256"]:
+                    raise ValueError("Completed policy checkpoint is corrupt")
+            if sha256_file(worker_dir / summary["final_policy_path"]) != summary["final_policy_sha256"]:
+                raise ValueError("Completed final policy is corrupt")
+            return dict(summary, reused_completed_outputs=True)
+        final_state = _state_paths(worker_dir, schedule, seed, algorithm_id=algorithm_id)[0]
+        if training_state_retention == "none" or not final_state.is_file():
+            raise RuntimeError(
+                "This interrupted run has no resumable final training state. "
+                "Playable policies cannot resume training; use a new RUN_ID."
+            )
     _write_json(manifest_path, manifest)
 
-    solver = _make_solver(seed, config)
+    solver = solver_factory(seed, config)
     manifest["feature_encoder"] = solver.feature_encoder.metadata()
     _write_json(manifest_path, manifest)
     records = (
@@ -370,11 +419,17 @@ def run_worker(
             algorithm_id=algorithm_id,
             read_training_state_fn=training_state_reader,
             restore_training_state_fn=training_state_restorer,
+            initial_resume_state=initial_resume_state,
         )
         if resume
         else []
     )
     captured = {str(row["checkpoint_id"]): dict(row) for row in records}
+    needs_state = require_resume_state or (
+        training_state_retention == "final" and (prior_exists or initial_resume_state is not None)
+    )
+    if needs_state and not records:
+        raise RuntimeError("A continuation was required, but no valid training state could be restored")
     solver.training_time_checkpoint_seconds = tuple(
         float(row["target_training_seconds"]) for row in schedule
     )
@@ -400,8 +455,10 @@ def run_worker(
             experiment_id=experiment_id,
             experiment_name=experiment_name,
             algorithm_id=algorithm_id,
-            execution_backend="sequential_seed_worker",
+            execution_backend=execution_backend,
         )
+        if extra_diagnostics_fn is not None:
+            raw_checkpoint.update(extra_diagnostics_fn(active_solver))
         save_policy_checkpoint(
             active_solver,
             checkpoint_path,
@@ -429,6 +486,11 @@ def run_worker(
             "sha256": sha256_file(checkpoint_path),
             "size_bytes": int(checkpoint_path.stat().st_size),
         }
+        if extra_diagnostics_fn is not None:
+            record["execution_diagnostics"] = {
+                key: value for key, value in raw_checkpoint.items()
+                if key.startswith("parallel_") or key.startswith("cumulative_")
+            }
         captured[checkpoint_id] = record
         ordered = [
             captured[str(row["checkpoint_id"])]
@@ -436,23 +498,31 @@ def run_worker(
             if str(row["checkpoint_id"]) in captured
         ]
         _write_incremental_manifests(worker_dir, ordered)
-        state_path = worker_dir / "training_states" / (
-            f"{algorithm_id}_seed_{seed}_{checkpoint_id}.pt"
+        save_state = training_state_retention == "all" or (
+            training_state_retention == "final" and checkpoint_id == schedule[-1]["checkpoint_id"]
         )
-        record["training_state_path"] = str(state_path.relative_to(worker_dir))
-        state_payload = training_state_builder(
-            active_solver,
-            seed=seed,
-            checkpoint_id=checkpoint_id,
-            repository_commit=commit,
-            config=config,
-            captured_checkpoints=ordered,
-        )
-        training_state_saver(state_path, state_payload)
-        del state_payload
-        record["training_state_sha256"] = sha256_file(state_path)
-        record["training_state_size_bytes"] = int(state_path.stat().st_size)
-        _write_incremental_manifests(worker_dir, ordered)
+        if save_state:
+            # Make the small policy durable before expensive final serialization.
+            if training_state_retention == "final":
+                _sync_remote(worker_dir, remote_task_env=remote_task_env, experiment_label=experiment_label)
+            state_path = worker_dir / "training_states" / (
+                f"{algorithm_id}_seed_{seed}_{checkpoint_id}.pt"
+            )
+            state_payload = training_state_builder(
+                active_solver, seed=seed, checkpoint_id=checkpoint_id,
+                repository_commit=commit, config=config, captured_checkpoints=ordered,
+            )
+            try:
+                training_state_saver(state_path, state_payload)
+            finally:
+                temporary = state_path.with_suffix(state_path.suffix + ".tmp")
+                if training_state_retention != "all" and temporary.is_file():
+                    temporary.unlink()  # Only this writer's unfinished private file.
+            del state_payload
+            record["training_state_path"] = str(state_path.relative_to(worker_dir))
+            record["training_state_sha256"] = sha256_file(state_path)
+            record["training_state_size_bytes"] = int(state_path.stat().st_size)
+            _write_incremental_manifests(worker_dir, ordered)
         _sync_remote(
             worker_dir,
             remote_task_env=remote_task_env,
@@ -468,9 +538,9 @@ def run_worker(
         if len(captured) == len(schedule):
             solver.stop_reason = "training_time_budget"
         ordered = [captured[str(row["checkpoint_id"])] for row in schedule]
-        if len(ordered) != 4 or solver.stop_reason != "training_time_budget":
+        if len(ordered) != len(schedule) or solver.stop_reason != "training_time_budget":
             raise RuntimeError(
-                f"{experiment_label} did not complete all four checkpoints"
+                f"{experiment_label} did not complete all {len(schedule)} checkpoints"
             )
         _write_csv(worker_dir / "checkpoint_rows.csv", checkpoint_rows)
         _write_incremental_manifests(worker_dir, ordered)
@@ -483,6 +553,7 @@ def run_worker(
             "schema_version": 1,
             "status": "complete",
             "experiment_id": experiment_id,
+            "training_state_retention": training_state_retention,
             "experiment_name": experiment_name,
             "algorithm_id": algorithm_id,
             "seed": int(seed),
@@ -509,6 +580,8 @@ def run_worker(
             "started_utc": manifest["started_utc"],
             "finished_utc": finished.isoformat(),
         }
+        if extra_diagnostics_fn is not None:
+            summary["execution_diagnostics"] = extra_diagnostics_fn(solver)
         _write_json(worker_dir / "summary.json", summary)
         _write_json(
             worker_dir / "SUCCESS.json",

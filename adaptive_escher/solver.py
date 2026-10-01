@@ -90,6 +90,9 @@ class PersistentFrozenTargetQValueTrainer(VRPDCFRPlusQValueTrainer):
         )
 
     def train_model(self, T):
+        if getattr(self, "cache_frozen_targets", False):
+            from .frozen_target_cache import train_with_cached_targets
+            return train_with_cached_targets(self, T)
         if self.batch_size > 0 and len(self.buffer) < self.batch_size:
             return None
         if len(self.buffer) == 0 or self.train_steps <= 0:

@@ -89,6 +89,300 @@ export RUN_ID="exp3-fhp-$(date -u '+%Y%m%d-%H%M%S')"
 
 See the [Experiment 3 protocol](experiments/fhp/exp3_fhp_wider_lossless_structured_ucv/README.md).
 
+## Active Experiment 4: frozen average-policy fitting audit
+
+This is a **new** Experiment 4, unrelated to the archived CPU-optimisation study.
+It reuses the completed Experiment 2 **24-hour reservoirs from seeds 0, 1, 2**;
+there is no new regret learning. Four reset policy fits cross uniform versus
+replay-mass-proportional group sampling with **20,000 versus 60,000 updates**.
+Network, loss objective, loss scale, learning rate and paired initialisations
+remain fixed. Separate held-out-group diagnostic fits test generalisation;
+the four playable policies use the complete reservoir.
+
+The remote controller runs a real-source cloud smoke, three parallel
+`n2-standard-8` workers (one per source seed), then aggregation. Evaluation
+includes restricted LBR, published rule agents and seat-swapped head-to-head
+play against the archived policy and the new 20,000-update control. It does
+**not** calculate exact exploitability. No full training states are uploaded
+again or needed on your laptop. Only the selected 24-hour states are fetched
+on the VMs, approximately 4.5 GB per seed.
+
+Run from this repository root, with the usual `PROJECT_ID`, `REGION`, `BUCKET`
+and `SA_EMAIL` already set. **The new code must first be committed and pushed.**
+Use a Python environment with this repository's dependencies for local smoke:
+
+```bash
+./gcp/run_exp4_average_policy_audit.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP2_RUN_ID="exp2-fhp-20260921-093839"
+export RUN_ID="exp4-audit-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+./gcp/run_exp4_average_policy_audit.sh run
+```
+
+The laptop may disconnect after submission. `run` always gates production on
+a successful **real-reservoir** cloud smoke; the local smoke uses synthetic
+targets on real FHP encodings. Check progress or resume a failed audit with
+the **same** source/run ID and pinned code revision:
+
+```bash
+./gcp/run_exp4_average_policy_audit.sh status
+./gcp/run_exp4_average_policy_audit.sh resume
+```
+
+Resume reuses completed fitting endpoints and cached evaluation tasks, and
+does not retrain Experiment 2. There are no automatic worker retries. Each
+worker has a 24-hour safety cap; this is a timeout, **not** a training budget.
+See the [full audit protocol](experiments/fhp/exp4_fhp_average_policy_audit/README.md)
+for resource limits, interpretation and service-account requirements.
+
+Download **all analytical outputs only** after aggregation succeeds:
+
+```bash
+AUDIT_BUCKET="${BUCKET%/}"
+[[ "$AUDIT_BUCKET" == gs://* ]] || AUDIT_BUCKET="gs://$AUDIT_BUCKET"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "$AUDIT_BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+## Active Experiment 5: frozen critic-target cache efficiency
+
+This paired component benchmark reuses FHP Experiment 2's final 24-hour states, seeds **0, 1, 2**.
+It compares the existing critic fit, which recomputes TD targets in each
+minibatch, with an opt-in fit that computes each replay row's frozen target
+once per fitting block. It does **not** retrain the whole algorithm or change
+the average-policy configuration.
+
+Each of three separate `n2-standard-8` VMs handles one source seed. The two
+arms run sequentially on the same VM, from identical model/Adam states and
+minibatch RNG states: two critic folds, 10,000 updates per fold, batch 2,048,
+three timing repeats. Timings include cache construction. Targets, final
+parameters, optimizer states, target averaging and RNG equality are checked;
+a speedup alone is not a correctness result. Caching remains **off by default**.
+
+Run from this repository root with `PROJECT_ID`, `REGION`, `BUCKET` and
+`SA_EMAIL` set. Commit and push this implementation before cloud submission.
+Use this repo's Python environment for the optional local smoke
+(or set `PYTHON=/path/to/venv/bin/python`):
+
+```bash
+./gcp/run_frozen_critic_target_efficiency.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export SOURCE_RUN_ID="exp2-fhp-20260921-093839"
+export RUN_ID="exp5-cache-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_frozen_critic_target_efficiency.sh run
+```
+
+Always reset the source/run variables when switching between repos.
+Use the bucket containing this repository's source run; it is also the output
+destination. Three simultaneous workers require 24 available N2 vCPUs.
+The remote controller runs a mandatory real-source smoke, the three paired
+workers, and aggregation. Your laptop may disconnect after submission.
+
+```bash
+./gcp/run_frozen_critic_target_efficiency.sh status
+# Only after a failure, with the same RUN_ID, SOURCE_RUN_ID and REPO_REF:
+./gcp/run_frozen_critic_target_efficiency.sh resume
+```
+
+After aggregation, download the complete small analysis folder (not the
+multi-GB source training states):
+
+```bash
+CACHE_BUCKET="${BUCKET%/}"
+[[ "$CACHE_BUCKET" == gs://* ]] || CACHE_BUCKET="gs://$CACHE_BUCKET"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "$CACHE_BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+Read `analysis/summary.json`'s `all_equivalence_checks_passed` as well as its
+speedup: a successfully completed benchmark can report a failed numerical
+comparison. See the [full protocol](experiments/fhp/exp5_fhp_critic_target_cache/README.md)
+for correctness gates, interpretation, memory and timeout limits.
+
+## Output retention for active Experiments 4–8
+
+Keep all analysis/evaluation results, diagnostic logs, reproducibility metadata
+and playable policy checkpoints. Experiments 4–7 produce **no retained training
+states or replay archives**. Experiment 5 already produces only diagnostics.
+Experiment 8 retains **one final full training state per seed**, at 48 active
+hours (or the final requested endpoint of a later extension), never intermediate
+full states. Temporary smoke-test states and imported source copies are not
+published. Existing Experiment 1–3 archives remain untouched; Experiments 4/5
+still read Experiment 2's final reservoirs as inputs.
+
+Playable policies cannot restart training. An interrupted Experiment 6/7 run,
+or Experiment 8 before its final state is durable, requires a **new RUN_ID**;
+the worker refuses to silently restart in the old output directory. Completed
+workers can be reused for aggregation. Automatic training-task retries are
+disabled. Experiment 4 can reuse completed fits/evaluation shards, but repeats
+an interrupted fitting path from its matched reset initialization.
+
+## Active Experiment 6: Experiment 2 on n2-standard-16
+
+This is a fresh **24-active-hour, three-seed** replication of Experiment 2 on
+a larger VM. Seeds **0, 1, 2** run independently and, by default, concurrently
+on three **n2-standard-16 (16 vCPU, 64 GiB)** VMs. The learner configuration is
+identical to Experiment 2: sequential collection, eight fitting threads,
+the same structured networks, replay capacities and update budgets.
+There are **no Ray traversal workers** and frozen-target caching is disabled.
+`PARALLELISM` controls concurrent seeds, not collection workers.
+
+The separate experiment name is `exp6_fhp_structured_n2_standard16`; policies,
+manifests and GCS prefixes are separate from Experiment 2.
+Reloadable policies (without full training states) are saved at the first completed
+iterations crossing **6, 12, 18 and 24 active hours**. As before, policy fitting,
+checkpoint persistence and upload time are excluded from the training clock,
+so billed/runtime hours exceed 24. There is no training-node cap.
+
+A larger VM does not guarantee higher throughput: collection remains serial
+and fitting still uses eight threads. This run supplies a same-machine
+sequential baseline for a future parallel-collection experiment.
+Historical Experiment 2 results may also reflect intervening runtime
+optimisations; do not attribute every difference solely to VM size.
+
+Run from this repo root with the usual `PROJECT_ID`, `REGION`, `BUCKET` and
+`SA_EMAIL` already set. The new code must be committed and pushed before GCP
+submission. Use the repository Python environment for local smoke; set
+`PYTHON=/path/to/venv/bin/python` if needed.
+
+```bash
+./gcp/run_exp6_structured_n2_standard16.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp6-vm16-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+./gcp/run_exp6_structured_n2_standard16.sh run
+```
+
+The cloud controller first runs the smoke on n2-standard-16, then training,
+then aggregation. The laptop can disconnect once submission succeeds.
+Three simultaneous seeds require **48 available regional N2 vCPUs**;
+`PARALLELISM=1` or `2` lowers concurrency without changing individual runs.
+
+```bash
+./gcp/run_exp6_structured_n2_standard16.sh status
+# Orchestration/aggregation recovery only; interrupted training needs a new RUN_ID:
+./gcp/run_exp6_structured_n2_standard16.sh resume
+```
+
+Download the small analytical outputs after aggregation succeeds:
+
+```bash
+EXP6_BUCKET="${BUCKET%/}"
+[[ "$EXP6_BUCKET" == gs://* ]] || EXP6_BUCKET="gs://$EXP6_BUCKET"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "$EXP6_BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+The analysis includes checkpoint/seed tables, a throughput summary and
+`nodes_by_training_time.png`. It does not automatically run LBR or
+head-to-head evaluation; the saved policies support the same evaluator as
+Experiment 2. See the [full protocol](experiments/fhp/exp6_fhp_structured_n2_standard16/README.md).
+
+## Active Experiment 7: eight-worker counterpart to Experiment 6
+
+This retains the exact Experiment 2/6 learning configuration, **three seeds
+(0, 1, 2)**, **24 active hours**, and one **n2-standard-16** per seed. Only
+trajectory collection becomes synchronous Ray-parallel: **eight single-threaded
+actors per VM**, sharing **10,000 total traversals per player per iteration**.
+The central learner still fits sequentially with eight Torch threads. Critic
+target caching is off. Run Experiments 6 and 7 from the same source commit.
+
+Playable policies, without full training states, are saved at completed
+iterations crossing **6, 12, 18 and 24 active hours**. Active time excludes policy
+checkpoint fitting, saving and uploads, so VM runtime exceeds 24 hours.
+Seed labels match, but parallel actor RNG streams mean sampled trajectories
+will not be identical to serial training.
+
+From the repo root, with the usual cloud variables set and the new code pushed:
+
+```bash
+./gcp/run_exp7_parallel_structured_n2_standard16.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp7-par8-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+./gcp/run_exp7_parallel_structured_n2_standard16.sh run
+```
+
+Use `PYTHON=/path/to/venv/bin/python` for local smoke if needed. The controller
+runs cloud smoke, three training VMs, and aggregation without the laptop staying
+on. `PARALLELISM` controls concurrent **seeds**, not actors. Three seeds require
+48 available regional N2 vCPUs. Cloud smoke includes production-capacity replay
+checkpoint saving/loading and a real eight-actor restart-equivalence check;
+production is submitted only after these pass. Local smoke uses tiny buffers.
+
+```bash
+./gcp/run_exp7_parallel_structured_n2_standard16.sh status
+# Orchestration/aggregation recovery only; interrupted training needs a new RUN_ID:
+./gcp/run_exp7_parallel_structured_n2_standard16.sh resume
+```
+
+The analysis provides node/time curves, a training-time breakdown, memory and
+per-seed throughput diagnostics. It does not assume an eightfold speedup or
+automatically launch strategic evaluation. See the [full protocol](experiments/fhp/exp7_fhp_parallel_structured_n2_standard16/README.md)
+for downloads and the analysis-only comparison command for Experiments 6/7.
+
+## Active Experiment 8: 48-hour parallel run with resumable final states
+
+Experiment 8 retains Experiment 7's exact learning configuration and hardware:
+**three seeds (0, 1, 2), one n2-standard-16 each, eight traversal actors per VM**.
+Each seed trains for **48 active hours**, with playable policies at
+**6, 12, 18, 24, 30, 36, 42 and 48 hours**, but a full training state **only at 48 hours**.
+The complete final state includes optimisers, replay, critic history and driver/
+actor random-number states, so training can genuinely continue later.
+
+From the repo root, after committing/pushing the code and setting the usual
+PROJECT_ID, REGION, BUCKET and SA_EMAIL:
+
+```bash
+./gcp/run_exp8_parallel_48h.sh smoke-local
+
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp8-par48-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+export EXP8_TOTAL_HOURS=48
+unset EXP8_SOURCE_RUN_ID
+./gcp/run_exp8_parallel_48h.sh run
+```
+
+Set PYTHON to the repository virtual environment's interpreter if needed for
+local smoke. The remote controller runs smoke, training and aggregation without
+the laptop remaining on. Cloud smoke checks full-capacity checkpoint storage;
+the eight-actor training smoke also tests extension past a completed endpoint.
+
+The training timeout is **72 wall-clock hours per attempt**, with no automatic training retry.
+The requested budget is still 48 active hours; checkpoint policy fits, saving
+and uploads add billable overhead. Three concurrent seeds use 144 active VM-hours
+and require 48 available regional N2 vCPUs.
+
+```bash
+./gcp/run_exp8_parallel_48h.sh status
+# Recover orchestration/aggregation or a saved final state; no mid-training recovery:
+./gcp/run_exp8_parallel_48h.sh resume
+```
+
+To extend a completed 48-hour run to 72 cumulative hours later, retain its
+original REPO_REF and choose a **new** RUN_ID:
+
+```bash
+export EXP8_SOURCE_RUN_ID="YOUR_COMPLETED_EXP8_RUN_ID"
+export EXP8_TOTAL_HOURS=72
+export RUN_ID="exp8-to72-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp8_parallel_48h.sh extend
+```
+
+The original results are preserved. Each seed resumes its final full state,
+not just the playable policy weights. The new analysis includes the earlier
+checkpoints and the added training. See the [full protocol](experiments/fhp/exp8_fhp_parallel_48h/README.md)
+for download commands, compatibility checks and continuation details.
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
