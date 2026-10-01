@@ -10,9 +10,9 @@ import torch
 
 from fhp_escher.features import (
     FHPFeatureEncoder,
-    FULL_STATE_LAYOUT,
+    ENCODER_ID,
+    make_feature_encoder,
     FeatureLayout,
-    POLICY_LAYOUT,
     StructuredFHPMLP,
 )
 from vr_deep_cfr.solver import AvePolicyTrainer
@@ -52,7 +52,7 @@ class StructuredFHPRegretTrainer(_StructuredModelMixin, VRDCFRPlusRegretTrainer)
         **kwargs,
     ):
         self.feature_encoder = feature_encoder
-        self.feature_layout = POLICY_LAYOUT
+        self.feature_layout = feature_encoder.policy_layout
         self.structured_branch_width = int(branch_width)
         self.replay_seed = int(replay_seed)
         super().__init__(*args, **kwargs)
@@ -83,7 +83,7 @@ class StructuredFHPAveragePolicyTrainer(
         **kwargs,
     ):
         self.feature_encoder = feature_encoder
-        self.feature_layout = POLICY_LAYOUT
+        self.feature_layout = feature_encoder.policy_layout
         self.structured_branch_width = int(branch_width)
         self.replay_seed = int(replay_seed)
         super().__init__(*args, **kwargs)
@@ -113,7 +113,7 @@ class StructuredFHPQMember(
         **kwargs,
     ):
         self.feature_encoder = feature_encoder
-        self.feature_layout = FULL_STATE_LAYOUT
+        self.feature_layout = feature_encoder.full_state_layout
         self.structured_branch_width = int(branch_width)
         self.replay_seed = int(replay_seed)
         super().__init__(*args, **kwargs)
@@ -215,7 +215,7 @@ class StructuredFHPResidualCalibrationTrainer(ResidualCalibrationTrainer):
         self.feature_layout = FeatureLayout(
             "residual_calibration",
             self.feature_size,
-            POLICY_LAYOUT.card_size,
+            feature_encoder.policy_layout.card_size,
         )
         hidden_layers = list(hidden_layers)
         self.model = StructuredFHPMLP(
@@ -238,9 +238,10 @@ class StructuredFHPGroupedWideUCVEscher(GroupedWideUnbiasedControlVariateEscher)
         self,
         *args,
         structured_branch_width: int = 64,
+        feature_encoder_id: str = ENCODER_ID,
         **kwargs,
     ):
-        self.feature_encoder = FHPFeatureEncoder()
+        self.feature_encoder = make_feature_encoder(feature_encoder_id)
         self.structured_branch_width = int(structured_branch_width)
         self.feature_replay_seed = int(kwargs.get("seed", 0))
         if self.structured_branch_width <= 0:

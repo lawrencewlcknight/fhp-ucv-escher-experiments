@@ -434,6 +434,37 @@ throughput charts, existing parallel diagnostics and new critic-cache timings.
 No exact exploitability or additional exploiter/head-to-head job is claimed.
 See the [full configuration, continuation, validation and download protocol](experiments/fhp/exp9_fhp_cached_parallel_24h/README.md).
 
+## Active Experiment 10: explicit hand-strength and board-interaction features
+
+Experiment 9 plus **30 additive player-information descriptors**: exact made-hand
+ranks and kickers, pocket-pair position, hole/board rank matches, board texture,
+suit concentration and current straight structure. All exact suit-canonical
+cards and betting information remain; there are no new buckets or state mergers.
+Policy inputs grow from 183 to **213**; critics gain per-player descriptors and
+grow from 263 to **323**. Hidden widths and all learning budgets are unchanged.
+
+The experiment retains **three seeds, 24 active hours, eight traversal actors
+per n2-standard-16 VM, cached critic targets**, playable policies at 6/12/18/24
+hours and one final resumable state per seed. Existing encoders/checkpoints are
+unaffected. It starts fresh rather than resuming Experiment 9's incompatible
+input layout. After committing and pushing, with the usual FHP cloud variables:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export FHP_EXP10_RUN_ID="exp10-features-$(date -u '+%Y%m%d-%H%M%S')"
+export RUN_ID="$FHP_EXP10_RUN_ID"
+export PARALLELISM=3
+export EXP10_TOTAL_HOURS=24
+unset EXP10_SOURCE_RUN_ID
+./gcp/run_exp10_hand_board_features.sh run
+```
+
+Cloud smoke precedes training and aggregation. The hypothesis is improved
+generalisation, not a guaranteed policy-quality gain. Saved policies support
+the existing encoder-aware evaluator; rule-agent, LBR and cross-play evaluation
+remain separate from training, as in Experiment 9. See the
+[feature specification, comparison protocol and continuation instructions](experiments/fhp/exp10_fhp_hand_board_features/README.md).
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`

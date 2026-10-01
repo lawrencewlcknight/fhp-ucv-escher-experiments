@@ -246,6 +246,13 @@ class FHPFeatureEncoder:
             "betting_encoding": "two_rounds_five_slots_fold_call_raise_one_hot",
         }
 
+    def _extra_policy_features(self, hole, board):
+        """Versioned additive encoders can extend the unchanged v1 prefix."""
+        return ()
+
+    def _extra_full_state_features(self, hole0, hole1, board):
+        return ()
+
     def information_state(self, state, player: int | None = None) -> np.ndarray:
         if player is None:
             player = int(state.current_player())
@@ -276,6 +283,7 @@ class FHPFeatureEncoder:
                 _suit_counts(board, 3.0),
                 _hole_flags(hole),
                 _five_card_category(hole, board),
+                *self._extra_policy_features(hole, board),
             ]
         ).astype(np.float32, copy=False)
         if features.shape != (self.policy_size,):
@@ -316,6 +324,7 @@ class FHPFeatureEncoder:
                 _hole_flags(hole1),
                 _five_card_category(hole0, board),
                 _five_card_category(hole1, board),
+                *self._extra_full_state_features(hole0, hole1, board),
             ]
         ).astype(np.float32, copy=False)
         if features.shape != (self.full_state_size,):
@@ -385,14 +394,22 @@ class StructuredFHPMLP(nn.Module):
         return self.output(self.trunk(joined))
 
 
+def make_feature_encoder(encoder_id=ENCODER_ID):
+    if encoder_id == ENCODER_ID:
+        return FHPFeatureEncoder()
+    # Lazy import avoids a cycle: the additive encoder subclasses the v1 one.
+    from .hand_board_features import FHPHandBoardFeatureEncoder
+    if encoder_id == FHPHandBoardFeatureEncoder.encoder_id:
+        return FHPHandBoardFeatureEncoder()
+    raise ValueError(f"Unsupported FHP feature encoder ID: {encoder_id!r}")
+
+
 def encoder_from_metadata(metadata: Mapping[str, object] | None):
     if metadata is None:
         return None
-    if metadata.get("id") != ENCODER_ID or int(metadata.get("version", -1)) != 1:
-        raise ValueError(f"Unsupported FHP feature encoder: {metadata!r}")
-    encoder = FHPFeatureEncoder()
+    encoder = make_feature_encoder(metadata.get("id"))
     if dict(metadata) != encoder.metadata():
-        raise ValueError("Checkpoint FHP encoder metadata differs from the v1 contract")
+        raise ValueError("Checkpoint FHP encoder metadata differs from its versioned contract")
     return encoder
 
 
@@ -404,4 +421,5 @@ __all__ = [
     "POLICY_LAYOUT",
     "StructuredFHPMLP",
     "encoder_from_metadata",
+    "make_feature_encoder",
 ]
