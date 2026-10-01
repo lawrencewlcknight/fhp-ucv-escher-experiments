@@ -493,6 +493,35 @@ Mandatory cloud smoke precedes training/aggregation. Follow-up rule-agent, LBR
 and cross-play evaluation remains separate, as in Experiment 9. See the
 [feature definitions, validation, continuation and download instructions](experiments/fhp/exp11_fhp_betting_economics/README.md).
 
+## Active Experiment 12: critic-only showdown comparison
+
+An independent follow-up to **Experiment 9**, without the additional policy
+features from Experiments 10/11. Three one-hot values identify player 0's win,
+a tie, or player 1's win if the completed flop hands reach showdown. They are
+zero before the full flop and enter **only the full-state critics** (263 to 266
+inputs). Policy/regret inputs stay at 183 and calibration at 189; their inputs
+remain unchanged when only the opponent's private cards change.
+
+Retains **three 24-active-hour seeds**, one **n2-standard-16** VM per seed,
+eight traversal workers, cached targets, playable 6/12/18/24-hour policies and
+one final resumable full state. After committing/pushing:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export FHP_EXP12_RUN_ID="exp12-showdown-$(date -u '+%Y%m%d-%H%M%S')"
+export RUN_ID="$FHP_EXP12_RUN_ID"
+export PARALLELISM=3
+export EXP12_TOTAL_HOURS=24
+unset EXP12_SOURCE_RUN_ID
+./gcp/run_exp12_critic_showdown.sh run
+```
+
+Cloud smoke gates production on strict cache/restart equivalence and checkpoint
+validation. No best response or future-board look-ahead is used in training;
+the comparison is conditional showdown strength, not a fold outcome. Policy
+quality needs the same separate rule-agent/LBR/cross-play evaluation as
+Experiment 9. See the [complete protocol](experiments/fhp/exp12_fhp_critic_showdown/README.md).
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`

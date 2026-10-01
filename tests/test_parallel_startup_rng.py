@@ -64,6 +64,7 @@ class FakeRay:
 
 @pytest.mark.parametrize("experiment", [
     "exp10_fhp_hand_board_features", "exp11_fhp_betting_economics",
+    "exp12_fhp_critic_showdown",
 ])
 @pytest.mark.parametrize("initialized,failure", [
     (False, None), (True, None), (False, "init"),

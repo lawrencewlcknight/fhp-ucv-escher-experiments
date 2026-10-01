@@ -412,6 +412,9 @@ def make_feature_encoder(encoder_id=ENCODER_ID):
     from .betting_economics_features import FHPBettingEconomicsFeatureEncoder
     if encoder_id == FHPBettingEconomicsFeatureEncoder.encoder_id:
         return FHPBettingEconomicsFeatureEncoder()
+    from .critic_showdown_features import FHPCriticShowdownFeatureEncoder
+    if encoder_id == FHPCriticShowdownFeatureEncoder.encoder_id:
+        return FHPCriticShowdownFeatureEncoder()
     raise ValueError(f"Unsupported FHP feature encoder ID: {encoder_id!r}")
 
 
