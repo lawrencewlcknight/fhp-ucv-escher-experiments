@@ -253,6 +253,12 @@ class FHPFeatureEncoder:
     def _extra_full_state_features(self, hole0, hole1, board):
         return ()
 
+    def _extra_policy_context(self, player, round_one_hot, betting):
+        return ()
+
+    def _extra_full_state_context(self, round_one_hot, betting):
+        return ()
+
     def information_state(self, state, player: int | None = None) -> np.ndarray:
         if player is None:
             player = int(state.current_player())
@@ -284,6 +290,7 @@ class FHPFeatureEncoder:
                 _hole_flags(hole),
                 _five_card_category(hole, board),
                 *self._extra_policy_features(hole, board),
+                *self._extra_policy_context(player, round_one_hot, betting),
             ]
         ).astype(np.float32, copy=False)
         if features.shape != (self.policy_size,):
@@ -325,6 +332,7 @@ class FHPFeatureEncoder:
                 _five_card_category(hole0, board),
                 _five_card_category(hole1, board),
                 *self._extra_full_state_features(hole0, hole1, board),
+                *self._extra_full_state_context(round_one_hot, betting),
             ]
         ).astype(np.float32, copy=False)
         if features.shape != (self.full_state_size,):
@@ -401,6 +409,9 @@ def make_feature_encoder(encoder_id=ENCODER_ID):
     from .hand_board_features import FHPHandBoardFeatureEncoder
     if encoder_id == FHPHandBoardFeatureEncoder.encoder_id:
         return FHPHandBoardFeatureEncoder()
+    from .betting_economics_features import FHPBettingEconomicsFeatureEncoder
+    if encoder_id == FHPBettingEconomicsFeatureEncoder.encoder_id:
+        return FHPBettingEconomicsFeatureEncoder()
     raise ValueError(f"Unsupported FHP feature encoder ID: {encoder_id!r}")
 
 

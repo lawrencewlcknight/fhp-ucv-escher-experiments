@@ -465,6 +465,34 @@ the existing encoder-aware evaluator; rule-agent, LBR and cross-play evaluation
 remain separate from training, as in Experiment 9. See the
 [feature specification, comparison protocol and continuation instructions](experiments/fhp/exp10_fhp_hand_board_features/README.md).
 
+## Active Experiment 11: explicit pot and betting-economics features
+
+An independent follow-up to **Experiment 9**, without Experiment 10's extra card
+features. Sixteen additive public descriptors expose pot/call cost in BB, pot
+odds, current-round contributions, remaining raises, position and recent
+aggression. Exact cards and betting history remain intact. Features are cached
+by public betting history; player/critic inputs become **199/295** while hidden
+widths and all optimisation budgets stay fixed.
+
+Retains three seeds, **24 active hours**, eight traversal actors per
+**n2-standard-16**, cached critics, playable 6/12/18/24-hour checkpoints and one
+final resumable state per seed. After committing/pushing, with existing cloud
+variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export FHP_EXP11_RUN_ID="exp11-econ-$(date -u '+%Y%m%d-%H%M%S')"
+export RUN_ID="$FHP_EXP11_RUN_ID"
+export PARALLELISM=3
+export EXP11_TOTAL_HOURS=24
+unset EXP11_SOURCE_RUN_ID
+./gcp/run_exp11_betting_economics.sh run
+```
+
+Mandatory cloud smoke precedes training/aggregation. Follow-up rule-agent, LBR
+and cross-play evaluation remains separate, as in Experiment 9. See the
+[feature definitions, validation, continuation and download instructions](experiments/fhp/exp11_fhp_betting_economics/README.md).
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
