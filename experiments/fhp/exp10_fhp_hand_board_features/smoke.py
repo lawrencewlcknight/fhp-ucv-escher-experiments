@@ -30,11 +30,20 @@ def learning_state(solver):
 def verify_cache_equivalence(directory):
     """Same fixed workload and actor streams, differing only in target caching."""
     outputs = []
+    initial_state = None
     for cached in (False, True):
         torch.set_num_threads(1)
         config = dict(smoke_config(), cache_frozen_critic_targets=cached)
         solver = _make_solver(0, config, smoke=True)
         try:
+            current_initial_state = learning_state(solver)
+            if initial_state is None:
+                initial_state = current_initial_state
+            else:
+                assert_identical(initial_state, current_initial_state,
+                                 "cached-vs-baseline.initial")
+                print("Cached/uncached initial learner, actor and RNG states match exactly.",
+                      flush=True)
             for _ in range(3):
                 solver.iteration()
                 # Also exercise the output fitter and its RNG consumption.
@@ -63,6 +72,7 @@ def verify_cache_equivalence(directory):
             solver.close()
     assert_identical(outputs[0], outputs[1], "cached-vs-baseline")
     result = {"status": "passed", "learning_state_bitwise_identical": True,
+              "initial_learning_state_bitwise_identical": True,
               "iterations_per_arm": 3, "traversal_actors": 8,
               "additional_critic_batch_size": 2048, "additional_critic_replay_rows": 2051,
               "additional_critic_fitting_threads": 8,
@@ -91,7 +101,7 @@ def assert_identical(a, b, path="state"):
         return
     else:
         equal = a == b or (isinstance(a, float) and isinstance(b, float) and np.isnan(a) and np.isnan(b))
-    assert equal, f"Restart changed {path}"
+    assert equal, f"Learning states differ at {path}"
 
 
 def _verify_continuation(directory: Path) -> dict:

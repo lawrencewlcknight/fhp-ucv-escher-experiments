@@ -142,6 +142,18 @@ uninterrupted training, final-only retention, and completed-endpoint extension.
 Cloud smoke additionally checks production-capacity checkpoint allocation; it
 does not prove worst-case fitting memory safety or convergence.
 
+Parallel startup preserves the central learner's post-model-initialisation
+Python, NumPy and Torch RNG states (including CUDA when available), so Ray's
+port selection and actor startup cannot change its training stream. Actor
+seeds are unchanged. The smoke checks identical initial learner/actor states
+and RNGs before requiring bitwise-identical cached/uncached training results;
+the equivalence checks are not relaxed. Integration tests also inject unequal
+startup RNG draws to exercise this protection. This is a reproducibility fix,
+not a change to features, targets, sampling rules or training budgets. Existing
+jobs remain pinned to their submitted code.
+New seeded runs may follow different trajectories from older code because
+infrastructure no longer advances the learner's random stream.
+
 ```bash
 # Optional local validation with the repository dependencies installed:
 python -m pytest -q tests/test_betting_economics_features.py \

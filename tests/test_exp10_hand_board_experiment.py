@@ -178,7 +178,7 @@ def test_import_preserves_source_and_checks_integrity(tmp_path):
 
 
 @pytest.mark.ray
-def test_completed_endpoint_can_extend_without_retraining(tmp_path):
+def test_completed_endpoint_can_extend_without_retraining(tmp_path, noisy_ray_startup):
     main(["smoke", "--output-root", str(tmp_path), "--no-resume"])
     worker = tmp_path / "workers" / task_name(0, 0)
     extended = tmp_path / "extension_smoke" / "workers" / task_name(0, 0)
@@ -205,6 +205,8 @@ def test_completed_endpoint_can_extend_without_retraining(tmp_path):
     assert len(json.loads((tmp_path / "analysis/throughput_summary.json").read_text())["checkpoint_means"]) == 4
     cache = json.loads((tmp_path / "cache_validation/cache_validation.json").read_text())
     assert cache["learning_state_bitwise_identical"]
+    assert cache["initial_learning_state_bitwise_identical"]
+    assert len(set(noisy_ray_startup)) >= 2
     assert payload["critic_cache"]["contract"]["member_flags"] == [True, True]
     assert final["execution_diagnostics"]["cumulative_cached_critic_fit_calls"] == 4
     assert not list((tmp_path / "cache_validation").rglob("*.pt"))

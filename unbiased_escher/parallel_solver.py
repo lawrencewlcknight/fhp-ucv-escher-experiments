@@ -497,6 +497,11 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         max_worker_traversals = max(
             partition_total(maximum_dispatch, self._parallel_num_workers)
         )
+        # Ray startup (including OS-dependent port selection) can consume the
+        # driver's global RNGs. Preserve the learner's post-initialisation
+        # streams, not the original seed: model initialisation has legitimately
+        # advanced them. Actors retain their separate, explicitly seeded RNGs.
+        learner_rng_state = self._capture_rng_state()
         try:
             import ray
 
@@ -531,6 +536,10 @@ class ParallelUnbiasedControlVariateEscher(UnbiasedControlVariateEscher):
         except Exception:
             self.close()
             raise
+        finally:
+            # Cover actor startup with an existing runtime and failure cleanup
+            # as well as ray.init(). Infrastructure is not a training RNG draw.
+            self._restore_rng_state(learner_rng_state)
 
     def _traversal_worker_class(self):
         return UCVEscherTraversalWorker
