@@ -383,6 +383,57 @@ not just the playable policy weights. The new analysis includes the earlier
 checkpoints and the added training. See the [full protocol](experiments/fhp/exp8_fhp_parallel_48h/README.md)
 for download commands, compatibility checks and continuation details.
 
+## Active Experiment 9: cached critics in the 24-hour parallel run
+
+Experiment 7's **24-active-hour**, **three-seed** configuration with cached
+frozen critic targets. Three **n2-standard-16** VMs run concurrently, each with
+eight traversal actors. Networks, replay, sampling and fitting budgets stay
+unchanged. Cache targets are rebuilt once per critic fit; this is an efficiency
+change, not a new learning rule.
+
+Keep playable policies at **6, 12, 18 and 24 hours**, analysis and diagnostics.
+As in Experiment 8, save **one full resumable state per seed at the final
+endpoint only**, including optimisers, replay and driver/actor RNG state.
+No intermediate full training states are retained. Temporary target caches
+are rebuilt after continuation.
+
+After committing/pushing, from the FHP repository root with existing
+PROJECT_ID, REGION, BUCKET and SA_EMAIL:
+
+```bash
+./gcp/run_exp9_cached_parallel_24h.sh smoke-local  # Optional local check
+
+export REPO_REF="$(git rev-parse HEAD)"
+export FHP_EXP9_RUN_ID="exp9-cache24-$(date -u '+%Y%m%d-%H%M%S')"
+export RUN_ID="$FHP_EXP9_RUN_ID"
+export PARALLELISM=3
+export EXP9_TOTAL_HOURS=24
+unset EXP9_SOURCE_RUN_ID
+./gcp/run_exp9_cached_parallel_24h.sh run
+./gcp/run_exp9_cached_parallel_24h.sh status
+```
+
+The remote controller runs mandatory smoke, training and aggregation. It needs
+48 available N2 vCPUs for three simultaneous training VMs; the laptop can
+disconnect after submission. Initial workers have a 36-hour wall ceiling and
+zero automatic retries. Allow 72 active VM-hours plus overhead. Interrupted
+training before the final state cannot be resumed from a playable policy.
+
+To continue a completed run to 48 cumulative active hours, keep its original
+REPO_REF, and use a new destination:
+
+```bash
+export EXP9_SOURCE_RUN_ID="$FHP_EXP9_RUN_ID"
+export EXP9_TOTAL_HOURS=48
+export RUN_ID="exp9-to48-$(date -u '+%Y%m%d-%H%M%S')"
+./gcp/run_exp9_cached_parallel_24h.sh extend
+```
+
+The original run remains untouched. Outputs include checkpoint/seed tables,
+throughput charts, existing parallel diagnostics and new critic-cache timings.
+No exact exploitability or additional exploiter/head-to-head job is claimed.
+See the [full configuration, continuation, validation and download protocol](experiments/fhp/exp9_fhp_cached_parallel_24h/README.md).
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
