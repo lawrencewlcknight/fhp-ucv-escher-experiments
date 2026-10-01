@@ -11,11 +11,18 @@ import numpy as np
 import torch
 
 from experiments.fhp.exp4_fhp_average_policy_audit.fitting import (
-    GroupSampler, diagnostics, new_model, state_hash, write_json,
+    GroupSampler, diagnostics, new_model as new_structured_model, state_hash, write_json,
 )
 from fhp_escher.checkpointing import LoadedFHPPolicy, sha256_file
 from fhp_escher.game import load_fhp_game
 from .data import group_digest
+
+
+def new_model(settings, seed):
+    if "model_type" not in settings:
+        return new_structured_model(settings, seed)
+    from fhp_escher.card_policy import new_model as new_card_model
+    return new_card_model(settings, seed)
 
 
 def optimizer_for(model, recipe):
@@ -35,8 +42,9 @@ def save_playable(template, model, path, metadata, probe_features, probe_masks):
     payload = deepcopy(template)
     payload["source_training_config"] = payload.pop("training_config", {})
     payload.update(
-        experiment_id=13, experiment_name="exp13_fhp_policy_capacity",
-        algorithm_id=f"policy_capacity_{metadata['architecture']}",
+        experiment_id=metadata.get("experiment_id", 13),
+        experiment_name=metadata.get("experiment_name", "exp13_fhp_policy_capacity"),
+        algorithm_id=f"{metadata.get('policy_id_prefix', 'policy_capacity')}_{metadata['architecture']}",
         policy_model=model.checkpoint_metadata(), policy_network_layers=list(model.hidden_layers),
         policy_state_dict={k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
         offline_fitting=metadata,
@@ -134,6 +142,7 @@ def fit_path(groups, validation, *, config, seed, replicate, architecture, recip
                                     "initialisation_seed", "sampler_seed", "data_sha256")},
             "recipe_config": config["recipes"][recipe], "fitting_seconds": fitting_seconds,
             "source_algorithm_id": template["algorithm_id"],
+            **{k: config[k] for k in ("experiment_id", "experiment_name", "policy_id_prefix") if k in config},
         }, groups.features[probe_ids], groups.masks[probe_ids])
         row["policy_sha256"] = sha256_file(directory / f"{endpoint}.pkl")
         diagnostic_seconds += time.monotonic() - started

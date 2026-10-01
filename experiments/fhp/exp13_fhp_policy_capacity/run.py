@@ -26,8 +26,8 @@ from .fitting import fit_path, diagnostics, fitting_benchmark, inference_benchma
 from .selection import fit_directory, select, read_selection, screen_key, screen_identity
 
 
-def sync_output(directory):
-    remote = os.environ.get("EXP13_REMOTE_WORKER")
+def sync_output(directory, config=None):
+    remote = os.environ.get((config or {}).get("remote_worker_env", "EXP13_REMOTE_WORKER"))
     if remote:
         subprocess.run(["gcloud", "storage", "rsync", "--recursive", "--exclude", r"\.pt$|\.tmp$",
                         str(directory), remote], check=True)
@@ -44,7 +44,7 @@ def resources(directory, stage, started, fitting_seconds=None, evaluation_worker
     })
 
 
-def prepare(source, root, seed, config):
+def prepare(source, root, seed, config, *, splitter=None):
     if seed not in config["seeds"]:
         raise ValueError("Unexpected source seed")
     torch.set_num_threads(1)
@@ -54,7 +54,7 @@ def prepare(source, root, seed, config):
     if template.get("audit_synthetic_fixture") and not config["smoke"]:
         raise ValueError("Synthetic source cannot be used for production")
     if not template.get("audit_synthetic_fixture") and int(buffer["size"]) != config["source_replay_rows"]:
-        raise ValueError("Experiment 13 requires exactly 1,000,000 source replay rows per seed")
+        raise ValueError("Frozen audit requires exactly 1,000,000 source replay rows per seed")
     provenance.pop("source_worker", None)
     repo = Path(__file__).resolve().parents[3]
     code_paths = sorted(Path(__file__).parent.glob("*.py")) + sorted(
@@ -62,6 +62,8 @@ def prepare(source, root, seed, config):
     code_paths += sorted((repo / "fhp_escher").rglob("*.py"))
     code_paths += sorted((repo / "fhp_evaluation").rglob("*.py"))
     code_paths += [Path(__file__).parent.parent / "retrospective_exp2_exp3_evaluation" / "run.py"]
+    if config["experiment_id"] != 13:
+        code_paths += sorted((repo / "experiments/fhp" / config["experiment_name"]).glob("*.py"))
     manifest = {"config": config, "provenance": provenance,
                 "audit_commit": subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip(),
                 "audit_source_sha256": hashlib.sha256(b"".join(
@@ -78,12 +80,12 @@ def prepare(source, root, seed, config):
     full_info = group_diagnostics(groups)
     benchmark_path = directory / "capacity_benchmark.json"
     if config["smoke"] and not template.get("audit_synthetic_fixture") and not benchmark_path.exists():
-        benchmark = fitting_benchmark(groups, contract(False))
+        benchmark = fitting_benchmark(groups, {**config, "batch_size": 2048})
         write_json(benchmark_path, benchmark)
         print("Production-batch fitting benchmark: " + json.dumps(benchmark), flush=True)
     if config["smoke"] and len(groups.features) > 128:
         groups = groups.subset(np.random.default_rng(902).choice(len(groups.features), 128, replace=False))
-    splits, metadata = split_groups(groups, config, seed)
+    splits, metadata = (splitter or split_groups)(groups, config, seed)
     replay_info = {"full_source": full_info, "fit_groups": group_diagnostics(groups),
                    "data_sha256": group_digest(groups), "splits": metadata,
                    "grouping_seconds": time.monotonic() - started}
@@ -99,10 +101,10 @@ def prepare(source, root, seed, config):
     return directory, manifest, groups, splits, template, replay_info
 
 
-def screen_worker(source, root, seed, *, smoke=False):
-    started, config = time.monotonic(), contract(smoke)
-    directory, _, groups, splits, template, info = prepare(source, root, seed, config)
-    sync = lambda: sync_output(directory)
+def screen_worker(source, root, seed, *, smoke=False, config=None, splitter=None):
+    started, config = time.monotonic(), contract(smoke) if config is None else config
+    directory, _, groups, splits, template, info = prepare(source, root, seed, config, splitter=splitter)
+    sync = lambda: sync_output(directory, config)
     # The test split is not passed to the fitter; no test metrics at this stage.
     del groups
     splits.pop("test")
@@ -121,15 +123,15 @@ def screen_worker(source, root, seed, *, smoke=False):
     sync()
 
 
-def deploy_worker(source, root, seed, *, smoke=False, evaluation_workers=8):
+def deploy_worker(source, root, seed, *, smoke=False, evaluation_workers=8, config=None, splitter=None):
     if not 1 <= evaluation_workers <= 8:
         raise ValueError("Evaluation workers must be 1..8")
-    started, config = time.monotonic(), contract(smoke)
-    directory, manifest, groups, splits, template, info = prepare(source, root, seed, config)
+    started, config = time.monotonic(), contract(smoke) if config is None else config
+    directory, manifest, groups, splits, template, info = prepare(source, root, seed, config, splitter=splitter)
     selection = read_selection(Path(root) / "selection.json", config, manifest, seed)
     if not (directory / "SCREEN_SUCCESS.json").exists():
         raise ValueError("Screen must complete before deployment")
-    sync = lambda: sync_output(directory)
+    sync = lambda: sync_output(directory, config)
     specs = arm_specs(config, selection)
     # Fixed controls and selected models only. Lock is copied alongside test results.
     test_path = directory / "diagnostic_test.json"
@@ -191,7 +193,10 @@ def deploy_worker(source, root, seed, *, smoke=False, evaluation_workers=8):
     sync()
 
 
-def main(argv=None):
+def main(argv=None, *, contract_factory=None, splitter=None, aggregate_fn=None):
+    from .aggregate import aggregate
+    make_config = contract if contract_factory is None else contract_factory
+    run_aggregate = aggregate if aggregate_fn is None else aggregate_fn
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     for action in ("screen", "deploy", "select", "aggregate", "smoke"):
@@ -213,27 +218,28 @@ def main(argv=None):
     if args.action == "fetch-source":
         fetch_source(args.bucket, args.run_id, args.seed, args.directory)
     elif args.action == "contract":
-        print(json.dumps(contract(), indent=2))
+        print(json.dumps(make_config(), indent=2))
     elif args.action == "select":
-        select(args.output_root, contract())
+        select(args.output_root, make_config())
     elif args.action == "aggregate":
-        from .aggregate import aggregate
-        print(aggregate(args.output_root))
+        print(run_aggregate(args.output_root, config=make_config()))
     elif args.action == "smoke":
-        from .aggregate import aggregate
         with TemporaryDirectory(prefix="fhp-capacity-source-") as temporary:
             source = args.source_worker or synthetic_source(temporary)
-            screen_worker(source, args.output_root, 0, smoke=True)
-            select(args.output_root, contract(True))
-            deploy_worker(source, args.output_root, 0, smoke=True, evaluation_workers=args.evaluation_workers)
-        print(aggregate(args.output_root, smoke=True))
+            config = make_config(True)
+            screen_worker(source, args.output_root, 0, smoke=True, config=config, splitter=splitter)
+            select(args.output_root, config)
+            deploy_worker(source, args.output_root, 0, smoke=True, evaluation_workers=args.evaluation_workers,
+                          config=config, splitter=splitter)
+        print(run_aggregate(args.output_root, smoke=True, config=config))
     else:
         if args.source_worker is None:
             parser.error("screen/deploy requires --source-worker")
         if args.action == "screen":
-            screen_worker(args.source_worker, args.output_root, args.seed)
+            screen_worker(args.source_worker, args.output_root, args.seed, config=make_config(), splitter=splitter)
         else:
-            deploy_worker(args.source_worker, args.output_root, args.seed, evaluation_workers=args.evaluation_workers)
+            deploy_worker(args.source_worker, args.output_root, args.seed, evaluation_workers=args.evaluation_workers,
+                          config=make_config(), splitter=splitter)
 
 
 if __name__ == "__main__":

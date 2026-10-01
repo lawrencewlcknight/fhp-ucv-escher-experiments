@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 
 from experiments.fhp.exp4_fhp_average_policy_audit.aggregate import summary, csv_file
-from fhp_evaluation.rule_agents import PUBLISHED_AGENT_NAMES
 from .config import contract, arm_specs
+from .evaluation import comparisons, expected_metrics
 from .fitting import write_json
 from .selection import fit_directory, read_selection, select
 
@@ -34,18 +34,20 @@ def paired_contrasts(values, config):
     result = []
     low, high = config["control_updates"]
     for metric in sorted({metric for metric, _ in values}):
-        for budget in (low, high, "tuned"):
-            a, b = values.get((metric, f"wide_{budget}")), values.get((metric, f"standard_{budget}"))
-            if a is None or b is None:
-                continue
-            diffs = np.asarray([a[s] - b[s] for s in config["seeds"]])
-            result.append({"metric": metric, "contrast": f"wide_minus_standard_{budget}",
-                           **difference_summary(diffs)})
-        arms = [f"standard_{low}", f"standard_{high}", f"wide_{low}", f"wide_{high}"]
-        if all((metric, arm) in values for arm in arms):
-            diffs = np.asarray([[values[(metric, arm)][s] for arm in arms] for s in config["seeds"]]) @ np.array([1, -1, -1, 1])
-            result.append({"metric": metric, "contrast": "capacity_by_budget_interaction",
-                           **difference_summary(diffs)})
+        for candidate, control in comparisons(config):
+            for budget in (low, high, "tuned"):
+                a, b = values.get((metric, f"{candidate}_{budget}")), values.get((metric, f"{control}_{budget}"))
+                if a is None or b is None:
+                    continue
+                diffs = np.asarray([a[s] - b[s] for s in config["seeds"]])
+                result.append({"metric": metric, "contrast": f"{candidate}_minus_{control}_{budget}",
+                               **difference_summary(diffs)})
+            arms = [f"{control}_{low}", f"{control}_{high}", f"{candidate}_{low}", f"{candidate}_{high}"]
+            if all((metric, arm) in values for arm in arms):
+                diffs = np.asarray([[values[(metric, arm)][s] for arm in arms] for s in config["seeds"]]) @ np.array([1, -1, -1, 1])
+                name = ("capacity_by_budget_interaction" if config["experiment_id"] == 13 else
+                        f"{candidate}_minus_{control}_by_budget_interaction")
+                result.append({"metric": metric, "contrast": name, **difference_summary(diffs)})
     return result
 
 
@@ -56,8 +58,8 @@ def difference_summary(diffs):
             "exact_two_sided_sign_flip_p": p}
 
 
-def aggregate(root, smoke=False):
-    root, config = Path(root), contract(smoke)
+def aggregate(root, smoke=False, *, config=None, plot_fn=None):
+    root, config = Path(root), contract(smoke) if config is None else config
     # Recompute from validation-only screen metadata to verify the locked decision.
     selected = select(root, config)
     read_selection(root / "selection.json", config)
@@ -112,10 +114,7 @@ def aggregate(root, smoke=False):
                 raise ValueError("Test scores refer to a different diagnostic policy")
             for metric in ("weighted_ce", "weighted_kl", "weighted_l1"):
                 add(seed, row["arm"], f"diagnostic_test_{metric}", row["test"]["all"][metric])
-        expected = {(arm, "lbr_mbb_per_hand") for arm in [*specs, "archived"]}
-        expected |= {(arm, f"rule_{opponent}") for arm in [*specs, "archived"] for opponent in PUBLISHED_AGENT_NAMES}
-        expected |= {(arm, "direct_crossplay_archived") for arm in specs}
-        expected |= {(arm, "direct_crossplay_matched_standard") for arm in specs if arm.startswith("wide_")}
+        expected = expected_metrics(config)
         if len(evaluations) != len(expected) or {(r["arm"], r["metric"]) for r in evaluations} != expected:
             raise ValueError("Incomplete gameplay evaluation")
         for row in evaluations:
@@ -146,20 +145,20 @@ def aggregate(root, smoke=False):
     analysis.mkdir(parents=True, exist_ok=True)
     write_json(analysis / "summary.json", {"config": config, "summaries": summaries,
         "paired_contrasts": contrasts, "selection": selected, "status": "complete",
-        "interpretation": "Three reused source trajectories, not six seeds. Fixed 20k capacity contrast is primary; tuned contrasts and all intervals are exploratory. LBR is not exact exploitability."})
+        "interpretation": config.get("interpretation", "Three reused source trajectories, not six seeds. Fixed 20k capacity contrast is primary; tuned contrasts and all intervals are exploratory. LBR is not exact exploitability.")})
     write_json(analysis / "source_manifests.json", sources)
     write_json(analysis / "detailed_diagnostics.json", details)
     for filename, data in (("per_replicate_metrics", rows), ("per_seed_metrics", per_seed),
                            ("aggregate_metrics", summaries), ("paired_contrasts", contrasts), ("learning_curves", curve_rows)):
         csv_file(analysis / f"{filename}.csv", data)
-    plot(analysis, config, curve_rows, summaries, values)
+    (plot if plot_fn is None else plot_fn)(analysis, config, curve_rows, summaries, values)
     (analysis / "README.md").write_text(
-        "# Frozen FHP policy-capacity audit\n\n"
-        "Only output-policy fitting changes. Standard/wide arms reuse identical Experiment 2 replay. "
+        "# " + config.get("analysis_title", "Frozen FHP policy-capacity audit") + "\n\n"
+        + config.get("analysis_intro", "Only output-policy fitting changes. Standard/wide arms reuse identical Experiment 2 replay. ") +
         "Two fitting replicas are averaged within each of three source seeds. "
         "Diagnostic fits use group-disjoint 80/10/10 partitions; validation selects one recipe/budget "
         "per architecture globally before held-out test access. Deployment fits use all replay. "
-        "Fixed-budget comparisons isolate width; tuned comparisons also change optimisation. "
+        "Fixed-budget comparisons isolate the network change; tuned comparisons also change optimisation. "
         "CE/KL fidelity is not exploitability. Direct-play wins and restricted LBR are complementary diagnostics. "
         "No exact exploitability or Nash guarantee is claimed. A selected maximum-budget endpoint "
         "or a recipe whose validation CE is still falling at the boundary flags potentially unresolved "

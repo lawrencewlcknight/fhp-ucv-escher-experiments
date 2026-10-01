@@ -145,6 +145,15 @@ class LoadedFHPPolicy(policy.Policy):
                 int(model_metadata["output_size"]),
                 branch_width=int(model_metadata["branch_width"]),
             )
+        elif model_metadata.get("type") == "fhp_card_residual_v1":
+            from .card_policy import ResidualCardPolicy
+            self.model = ResidualCardPolicy(model_metadata.get("kind"))
+            if (model_metadata != self.model.checkpoint_metadata()
+                    or self.feature_encoder is None
+                    or self.feature_encoder.policy_layout != self.model.layout
+                    or int(self.checkpoint["input_size"]) != self.model.input_size
+                    or int(self.checkpoint["num_actions"]) != self.model.output_size):
+                raise ValueError("Card architecture checkpoint metadata or encoder mismatch")
         else:
             raise ValueError(f"Unsupported checkpoint policy model: {model_metadata!r}")
         self.model.load_state_dict(self.checkpoint["policy_state_dict"])

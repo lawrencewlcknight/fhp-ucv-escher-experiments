@@ -79,7 +79,7 @@ def build_job(args):
     return apply_retention(job, kind=args.kind)
 
 
-def main():
+def main(builder=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", required=True, choices=KINDS)
     parser.add_argument("--output", required=True, type=Path)
@@ -90,7 +90,7 @@ def main():
     parser.add_argument("--controller-action", choices=("orchestrate", "orchestrate-resume"), default="orchestrate")
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(build_job(args), indent=2) + "\n")
+    args.output.write_text(json.dumps((build_job if builder is None else builder)(args), indent=2) + "\n")
 
 
 if __name__ == "__main__":

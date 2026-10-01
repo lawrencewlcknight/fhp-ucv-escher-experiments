@@ -17,6 +17,24 @@ from .fitting import write_json
 from .config import arm_name
 
 
+def comparisons(config):
+    return config.get("comparisons", [["wide", "standard"]])
+
+
+def matched_opponents(name, config):
+    return {f"matched_{b}": b + name[len(a):] for a, b in comparisons(config) if name.startswith(a + "_")}
+
+
+def expected_metrics(config):
+    arms = [arm_name(a, b, r) for a in config["architectures"]
+            for b in [*config["control_updates"], "tuned"] for r in config["replicates"]]
+    expected = {(arm, "lbr_mbb_per_hand") for arm in [*arms, "archived"]}
+    expected |= {(arm, f"rule_{opponent}") for arm in [*arms, "archived"] for opponent in PUBLISHED_AGENT_NAMES}
+    expected |= {(arm, "direct_crossplay_archived") for arm in arms}
+    expected |= {(arm, f"direct_crossplay_{label}") for arm in arms for label in matched_opponents(arm, config)}
+    return expected
+
+
 def build_tasks(policies, config, seed):
     """Same random deals across arms; direct capacity contrasts match source/replicate."""
     tasks = []
@@ -41,9 +59,7 @@ def build_tasks(policies, config, seed):
                           "lbr_rollouts": config["lbr_rollouts"]})
         if name == "archived":
             continue
-        opponents = {"archived": "archived"}
-        if name.startswith("wide_"):
-            opponents["matched_standard"] = name.replace("wide_", "standard_", 1)
+        opponents = {"archived": "archived", **matched_opponents(name, config)}
         for label, opponent in opponents.items():
             tasks.append({**common, "kind": "direct_crossplay", "opponent": label,
                           "task_id": f"{name}_versus_{label}",
@@ -73,10 +89,29 @@ def validate_result(task, result):
                 raise ValueError("Incomplete or invalid LBR shard")
 
 
+def evaluation_identity(task):
+    """Identical policy bytes and randomness can share work despite arm aliases."""
+    keys = ("kind", "source_seed", "policy_a_sha256", "policy_b_sha256",
+            "evaluation_seed", "num_deals", "lbr_seed", "lbr_rollouts")
+    value = {k: task.get(k) for k in keys}
+    if task["kind"] == "rule":
+        value["opponent"] = task["opponent"]
+    return json.dumps(value, sort_keys=True)
+
+
+def relabel_result(result, task):
+    if task["kind"] == "lbr":
+        a, b = "local_best_response", task["policy_a_name"]
+    else:
+        a = task["policy_a_name"]
+        b = task["opponent"] if task["kind"] == "rule" else task["policy_b_name"]
+    return {**result, **task, "policy_a": a, "policy_b": b}
+
+
 def evaluate(policies, config, seed, directory, workers=8, on_progress=None):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    pending, rows = [], []
+    pending, rows, reusable = [], [], {}
     for task in build_tasks(policies, config, seed):
         path = directory / f"{task['task_id']}.json"
         fingerprint = task_fingerprint(task)
@@ -86,6 +121,7 @@ def evaluate(policies, config, seed, directory, workers=8, on_progress=None):
                 raise ValueError(f"Incompatible cached evaluation: {path}")
             validate_result(task, saved["result"])
             rows.append(saved["result"])
+            reusable[evaluation_identity(task)] = saved["result"]
         else:
             pending.append((task, path, fingerprint))
 
@@ -98,15 +134,38 @@ def evaluate(policies, config, seed, directory, workers=8, on_progress=None):
             if on_progress:
                 on_progress()
 
+    groups = {}
+    cached_tasks = len(rows)
+    deduplicate = config.get("deduplicate_identical_evaluation", False)
+    for item in pending:
+        task, path, fingerprint = item
+        key = evaluation_identity(task) if deduplicate else task["task_id"]
+        if deduplicate and key in reusable:
+            accept(relabel_result(reusable[key], task), task, path, fingerprint)
+        else:
+            groups.setdefault(key, []).append(item)
+
+    def accept_group(result, members):
+        validate_result(members[0][0], result)
+        for task, path, fingerprint in members:
+            accept(relabel_result(result, task), task, path, fingerprint)
+
     if workers == 1:
-        for task, path, fingerprint in pending:
-            accept(_evaluation_worker(task), task, path, fingerprint)
-    elif pending:
+        for members in groups.values():
+            accept_group(_evaluation_worker(members[0][0]), members)
+    elif groups:
         # Spawn avoids inheriting replay allocations or a threaded Torch runtime.
         with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as pool:
-            futures = {pool.submit(_evaluation_worker, task): (task, path, fp) for task, path, fp in pending}
+            futures = {pool.submit(_evaluation_worker, members[0][0]): members for members in groups.values()}
             for future in as_completed(futures):
-                accept(future.result(), *futures[future])
+                accept_group(future.result(), futures[future])
+
+    write_json(directory.parent / "evaluation_work.json", {
+        "requested_tasks": cached_tasks + len(pending), "cached_tasks": cached_tasks,
+        "executed_tasks_this_attempt": len(groups),
+        "aliased_tasks_this_attempt": len(pending) - len(groups),
+        "identical_policy_evaluation_deduplicated": deduplicate,
+    })
 
     summaries = []
     for name in policies:

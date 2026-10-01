@@ -550,6 +550,35 @@ export PARALLELISM=3
 See the [Experiment 13 protocol](experiments/fhp/exp13_fhp_policy_capacity/README.md)
 for selection rules, limitations, cloud resumption and analysis-only downloads.
 
+## Active Experiment 14: frozen-reservoir card-architecture audit
+
+Tests whether suit-shared policy networks generalise better than a matched
+dense residual, using the same three Experiment 2 final reservoirs. Four arms:
+the original 74k-parameter policy, a dense residual control, a Deep Sets suit
+encoder and a four-token attention encoder (all residual arms approximately
+133k parameters). The exact canonical pathway is retained; only the output
+policy is fitted, without critic/regret retraining or privileged information.
+
+The audit uses card-configuration-disjoint 80/10/10 partitions, matched 20k/60k
+controls, equal four-recipe tuning, locked held-out testing, full-replay refits
+and rule/LBR/direct-play evaluation. Three source VMs run concurrently.
+No new full replay/training states are retained.
+
+After committing and pushing:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP2_RUN_ID="exp2-fhp-20260921-093839"
+export RUN_ID="exp14-cards-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+./gcp/run_exp14_card_architecture.sh run
+```
+
+See the [Experiment 14 protocol](experiments/fhp/exp14_fhp_card_architecture/README.md)
+for architecture details, validity checks, costs and limitations. It does not
+require Experiment 13 results and does not automatically launch end-to-end UCV
+training.
+
 ## Shared policy evaluation
 
 FHP checkpoints are evaluated with the validated `fhp-evaluation-suite`
