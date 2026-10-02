@@ -46,7 +46,7 @@ git -C "$REPO_DIR" show "$REPO_REF:gcp/retrospective_exp6_exp7_evaluation_batch.
 python3 "$TEMP_DIR/builder.py" --output "$TEMP_DIR/job.json" --run-id "$RUN_ID" \
   --exp6-run-id "$EXP6_RUN_ID" --exp7-run-id "$EXP7_RUN_ID" --bucket-root "$BUCKET_ROOT" \
   --service-account "$SA_EMAIL" --repo-ref "$REPO_REF" --max-hours "${EVAL_MAX_HOURS:-36}" \
-  "${RESUME_ARGS[@]}"
+  ${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"}
 if [[ "$ACTION" == dry-run ]]; then
   cp "$TEMP_DIR/job.json" "$REPO_DIR/retrospective_exp6_exp7_evaluation_job.json"
   echo "Wrote retrospective_exp6_exp7_evaluation_job.json; no cloud job submitted."

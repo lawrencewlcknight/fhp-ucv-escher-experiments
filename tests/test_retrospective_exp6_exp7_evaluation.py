@@ -223,3 +223,16 @@ def test_single_vm_job_smoke_resume_and_uploads(tmp_path):
 def test_reject_unsafe_cloud_targets(override):
     with pytest.raises(ValueError):
         build_job(batch_args(**override))
+
+
+@pytest.mark.parametrize("contents, expected", [("", ""), ("--resume", "--resume")])
+def test_launcher_optional_array_with_bash_nounset(contents, expected):
+    # macOS ships Bash 3.2: an ordinary empty-array expansion fails under set -u.
+    launcher = Path(__file__).resolve().parents[1] / "gcp/run_retrospective_exp6_exp7_evaluation.sh"
+    expansion = '${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"}'
+    assert expansion in launcher.read_text()
+    result = subprocess.run(
+        ["/bin/bash", "-uc", f'RESUME_ARGS=({contents}); printf "%s" {expansion}'],
+        check=True, capture_output=True, text=True,
+    )
+    assert result.stdout == expected
