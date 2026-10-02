@@ -29,6 +29,49 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Evaluation of Experiments 7 and 9: cached versus uncached critic targets
+
+This evaluation-only job scores all 24 policies (three seeds, four checkpoints
+per method) using the existing five-rule-agent/LBR framework and head-to-head
+play. The [full protocol](../experiments/fhp/retrospective_exp7_exp9_evaluation/README.md)
+documents budgets, interpretation, source checks, recovery and local testing.
+The primary comparison is Exp9 versus Exp7 after 24 active training hours;
+earlier, temporal and approximate node-matched comparisons are also retained.
+
+After committing and pushing, assuming the usual environment variables are set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP7_RUN_ID="exp7-par8-20261001-005151"
+export EXP9_RUN_ID="exp9-cache24-20261001-132550"
+export RUN_ID="fhp-eval79-$(date -u '+%Y%m%d-%H%M%S')"
+
+# One n2-standard-8: real-checkpoint cloud smoke, then full evaluation if it passes.
+bash gcp/run_retrospective_exp7_exp9_evaluation.sh run
+bash gcp/run_retrospective_exp7_exp9_evaluation.sh status
+```
+
+There is no training phase. The default elapsed safety ceiling is 36 hours
+(`EVAL_MAX_HOURS` can override it); scoring stops as soon as it finishes.
+You may disconnect after submission. The VM downloads policy files automatically:
+analysis-only local downloads are sufficient for launching this cloud job.
+
+If the evaluation fails, retain the same variables and pinned commit:
+
+```bash
+bash gcp/run_retrospective_exp7_exp9_evaluation.sh resume
+```
+
+Completed scoring tasks are reused; incompatible or concurrent resumes fail.
+Download the final analysis without its per-task recovery files:
+
+```bash
+export BUCKET_ROOT="gs://${BUCKET#gs://}"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "${BUCKET_ROOT%/}/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
 ## Active Experiment 1: three-seed grouped-wide baseline
 
 The active `exp1_fhp_grouped_wide_ucv_baseline` uses a remote controller and a

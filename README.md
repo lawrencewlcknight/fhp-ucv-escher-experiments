@@ -1034,6 +1034,28 @@ Launch with `bash gcp/run_retrospective_exp6_exp7_evaluation.sh run` after pushi
 and pinning the evaluation commit; see the protocol for environment variables,
 resume and analysis-only download commands.
 
+## Frozen-policy evaluation of Experiments 7 and 9
+
+The [Exp7/9 evaluation protocol](experiments/fhp/retrospective_exp7_exp9_evaluation/README.md)
+tests whether critic-target caching improves policy quality at equal active
+training time. It evaluates all three seeds at 6/12/18/24h using the existing
+five-rule-agent and LBR suite, matched-time and temporal head-to-head, and an
+explicitly approximate node comparison (Exp9 12h versus Exp7 18h).
+No training or policy refitting is performed. One `n2-standard-8` Batch VM runs
+smoke before full evaluation and saves resumable per-task results.
+
+After committing and pushing the evaluation code, with the usual GCP variables:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP7_RUN_ID="exp7-par8-20261001-005151"
+export EXP9_RUN_ID="exp9-cache24-20261001-132550"
+export RUN_ID="fhp-eval79-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_retrospective_exp7_exp9_evaluation.sh run
+```
+
+See the protocol for status, resume, local smoke and download instructions.
+
 ## Verification
 
 ```bash
