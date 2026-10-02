@@ -1022,6 +1022,18 @@ reported allocator errors, probable OOM/SIGKILL, timeout/termination, Python
 exceptions, and other nonzero exits. The run log also attempts to capture
 kernel OOM messages when the VM permits it.
 
+## Frozen-policy evaluation of Experiments 6 and 7
+
+The [Exp6/7 evaluation protocol](experiments/fhp/retrospective_exp6_exp7_evaluation/README.md)
+compares the sequential and eight-collector models on the same rule-agent/LBR
+suite used for Experiments 1–3. It includes direct head-to-head at 6/12/18/24h,
+within-run temporal head-to-head, and an explicitly approximate node-matched
+comparison. No solver retraining is performed. One `n2-standard-8` evaluation VM
+runs a cloud smoke test then full scoring, with resumable per-task output.
+Launch with `bash gcp/run_retrospective_exp6_exp7_evaluation.sh run` after pushing
+and pinning the evaluation commit; see the protocol for environment variables,
+resume and analysis-only download commands.
+
 ## Verification
 
 ```bash

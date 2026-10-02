@@ -116,9 +116,9 @@ def _checkpoint_path(worker: Path, row: dict) -> Path:
     raise FileNotFoundError(candidates[0])
 
 
-def discover_checkpoints(run_root: Path, experiment: str) -> list[dict]:
+def discover_checkpoints(run_root: Path, experiment: str, *, contracts=None) -> list[dict]:
     """Validate and return the three-seed, four-checkpoint policy index."""
-    contract = EXPERIMENTS[experiment]
+    contract = (EXPERIMENTS if contracts is None else contracts)[experiment]
     workers_root = Path(run_root).resolve() / "workers"
     if not workers_root.is_dir():
         raise FileNotFoundError(f"Missing workers directory: {workers_root}")
@@ -290,7 +290,14 @@ def _evaluation_worker(task: dict) -> dict:
     return result
 
 
-def _build_tasks(records: list[dict], args) -> list[dict]:
+def _build_tasks(
+    records: list[dict], args, *, experiments=None,
+    direct_pair=("exp2", "exp3"), node_hours=(18, 24),
+) -> list[dict]:
+    """Shared duplicate-deal protocol; defaults preserve the original evaluation."""
+    experiments = EXPERIMENTS if experiments is None else experiments
+    left_id, right_id = direct_pair
+    pair_id = f"{left_id}_vs_{right_id}"
     tasks = []
     by_key = {
         (row["experiment"], row["seed"], row["training_hours"]): row for row in records
@@ -344,7 +351,7 @@ def _build_tasks(records: list[dict], args) -> list[dict]:
             shard_index += 1
     active_seeds = (0,) if args.smoke else EXPECTED_SEEDS
     active_hours = (6, 12) if args.smoke else EXPECTED_HOURS
-    for experiment in EXPERIMENTS:
+    for experiment in experiments:
         for seed in active_seeds:
             for earlier, later in itertools.combinations(active_hours, 2):
                 later_row = by_key[(experiment, seed, later)]
@@ -370,42 +377,43 @@ def _build_tasks(records: list[dict], args) -> list[dict]:
                 )
     for seed in active_seeds:
         for hour in active_hours:
-            left = by_key[("exp2", seed, hour)]
-            right = by_key[("exp3", seed, hour)]
+            left = by_key[(left_id, seed, hour)]
+            right = by_key[(right_id, seed, hour)]
             tasks.append(
                 {
-                    "task_id": f"direct_exp2_vs_exp3_seed_{seed}_{hour}h",
+                    "task_id": f"direct_{pair_id}_seed_{seed}_{hour}h",
                     "kind": "direct_crossplay",
-                    "experiment": "exp2_vs_exp3",
+                    "experiment": pair_id,
                     "training_seed": seed,
                     "training_hours": hour,
                     "policy_a_path": left["checkpoint_path"],
                     "policy_b_path": right["checkpoint_path"],
-                    "policy_a_name": f"exp2_seed_{seed}_time_{hour:02d}h",
-                    "policy_b_name": f"exp3_seed_{seed}_time_{hour:02d}h",
+                    "policy_a_name": f"{left_id}_seed_{seed}_time_{hour:02d}h",
+                    "policy_b_name": f"{right_id}_seed_{seed}_time_{hour:02d}h",
                     "num_deals": int(args.crossplay_deals),
                     "evaluation_seed": int(args.base_seed + 3_000_000 + hour),
                 }
             )
-    if not args.smoke:
+    if not args.smoke and node_hours is not None:
+        left_hour, right_hour = node_hours
         for seed in active_seeds:
-            left = by_key[("exp2", seed, 18)]
-            right = by_key[("exp3", seed, 24)]
+            left = by_key[(left_id, seed, left_hour)]
+            right = by_key[(right_id, seed, right_hour)]
             tasks.append(
                 {
-                    "task_id": f"node_matched_exp2_18h_vs_exp3_24h_seed_{seed}",
+                    "task_id": f"node_matched_{left_id}_{left_hour}h_vs_{right_id}_{right_hour}h_seed_{seed}",
                     "kind": "node_matched_crossplay",
-                    "experiment": "exp2_vs_exp3",
+                    "experiment": pair_id,
                     "training_seed": seed,
-                    "training_hours": 18,
-                    "exp2_hours": 18,
-                    "exp3_hours": 24,
-                    "exp2_nodes_touched": left["nodes_touched"],
-                    "exp3_nodes_touched": right["nodes_touched"],
+                    "training_hours": left_hour,
+                    f"{left_id}_hours": left_hour,
+                    f"{right_id}_hours": right_hour,
+                    f"{left_id}_nodes_touched": left["nodes_touched"],
+                    f"{right_id}_nodes_touched": right["nodes_touched"],
                     "policy_a_path": left["checkpoint_path"],
                     "policy_b_path": right["checkpoint_path"],
-                    "policy_a_name": f"exp2_seed_{seed}_time_18h",
-                    "policy_b_name": f"exp3_seed_{seed}_time_24h",
+                    "policy_a_name": f"{left_id}_seed_{seed}_time_{left_hour:02d}h",
+                    "policy_b_name": f"{right_id}_seed_{seed}_time_{right_hour:02d}h",
                     "num_deals": int(args.crossplay_deals),
                     "evaluation_seed": int(args.base_seed + 3_500_000),
                 }
@@ -550,7 +558,8 @@ def _attach_mean_nodes(rows: list[dict], records: list[dict]) -> None:
 
 
 def _plot_analysis(
-    output_dir: Path, aggregate_rule_mean, aggregate_lbr, aggregate_direct
+    output_dir: Path, aggregate_rule_mean, aggregate_lbr, aggregate_direct,
+    *, experiments=None, direct_pair=("exp2", "exp3"),
 ) -> None:
     os.environ.setdefault("MPLCONFIGDIR", "/tmp/fhp-evaluation-matplotlib")
     import matplotlib
@@ -558,7 +567,8 @@ def _plot_analysis(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    style = {"exp2": ("#1f77b4", "o"), "exp3": ("#ff7f0e", "s")}
+    experiments = EXPERIMENTS if experiments is None else experiments
+    style = dict(zip(experiments, (("#1f77b4", "o"), ("#ff7f0e", "s"))))
     metric_plots = (
         (
             "rule_agent_mean_by_time.png",
@@ -575,7 +585,7 @@ def _plot_analysis(
     )
     for filename, rows, ylabel, title in metric_plots:
         fig, ax = plt.subplots(figsize=(8, 5))
-        for experiment in EXPERIMENTS:
+        for experiment in experiments:
             selected = sorted(
                 (row for row in rows if row["experiment"] == experiment),
                 key=lambda row: row["training_hours"],
@@ -588,7 +598,7 @@ def _plot_analysis(
                 x,
                 y,
                 yerr=errors,
-                label=EXPERIMENTS[experiment]["label"],
+                label=experiments[experiment]["label"],
                 color=colour,
                 marker=marker,
                 capsize=4,
@@ -618,7 +628,7 @@ def _plot_analysis(
         ),
     ):
         fig, ax = plt.subplots(figsize=(8, 5))
-        for experiment in EXPERIMENTS:
+        for experiment in experiments:
             selected = sorted(
                 (row for row in rows if row["experiment"] == experiment),
                 key=lambda row: row["mean_nodes_touched"],
@@ -628,7 +638,7 @@ def _plot_analysis(
                 [row["mean_nodes_touched"] for row in selected],
                 [row["mean_mbb_per_hand"] for row in selected],
                 yerr=[row["training_seed_se_mbb_per_hand"] for row in selected],
-                label=EXPERIMENTS[experiment]["label"],
+                label=experiments[experiment]["label"],
                 color=colour,
                 marker=marker,
                 capsize=4,
@@ -655,11 +665,12 @@ def _plot_analysis(
     )
     ax.axhline(0.0, color="black", linewidth=0.8)
     ax.set_xlabel("Effective training time (hours)")
-    ax.set_ylabel("Experiment 2 minus Experiment 3 (mbb/hand)")
+    left_id, right_id = direct_pair
+    ax.set_ylabel(f"{left_id.upper()} minus {right_id.upper()} (mbb/hand)")
     ax.set_title("Direct duplicate cross-play")
     ax.grid(alpha=0.25)
     fig.tight_layout()
-    fig.savefig(output_dir / "direct_exp2_vs_exp3_by_time.png", dpi=180)
+    fig.savefig(output_dir / f"direct_{left_id}_vs_{right_id}_by_time.png", dpi=180)
     plt.close(fig)
 
 
