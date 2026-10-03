@@ -272,7 +272,10 @@ def test_cloud_routes_only_exp14_and_retains_no_training_states(tmp_path, kind):
     job = json.loads(output.read_text())
     group = job["taskGroups"][0]
     text = group["taskSpec"]["runnables"][0]["script"]["text"]
-    assert "exp13" not in text and "EXP13" not in text
+    # The standalone provenance gate fingerprints the reused Exp13 source;
+    # executable routes and remote-output variables must still be Exp14 only.
+    assert "-m experiments.fhp.exp13" not in text and "EXP13_REMOTE" not in text
+    assert "run_exp13_policy_capacity.sh" not in text
     assert "exp14" in text and group["taskSpec"]["maxRetryCount"] == 0
     assert group["taskCount"] == (3 if kind in ("screen", "train") else 1)
     if kind in ("screen", "train"):

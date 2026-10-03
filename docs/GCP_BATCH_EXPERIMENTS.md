@@ -72,6 +72,85 @@ gcloud storage rsync --recursive --exclude='.*task_results/.*' \
   "${BUCKET_ROOT%/}/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
 ```
 
+## Evaluation of Experiments 9–12: four-way representation comparison
+
+This evaluation-only job compares all 48 saved policies (four experiments,
+three seeds, 6/12/18/24h). It uses the established five-rule-agent/LBR suite,
+all six matched-time experiment pairings and within-run temporal head-to-head.
+The [full protocol](../experiments/fhp/retrospective_exp9_exp10_exp11_exp12_evaluation/README.md)
+describes validation, budgets, uncertainty, seven charts and recovery.
+
+After committing and pushing the new code, with the usual GCP variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP9_RUN_ID=exp9-cache24-20261001-132550
+export EXP10_RUN_ID=exp10-features-20261001-161740
+export EXP11_RUN_ID=exp11-econ-20261001-153659
+export EXP12_RUN_ID=exp12-showdown-20261001-165650
+export RUN_ID="fhp-eval9to12-$(date -u '+%Y%m%d-%H%M%S')"
+
+# One n2-standard-16 VM: cloud smoke, then full scoring if it passes.
+bash gcp/run_retrospective_exp9_exp10_exp11_exp12_evaluation.sh run
+bash gcp/run_retrospective_exp9_exp10_exp11_exp12_evaluation.sh status
+```
+
+There is no training/refitting. Sixteen CPU scoring processes use a 48-hour
+elapsed safety cap (override with `EVAL_MAX_HOURS`, 1–72). The job stops when
+finished and saves per-task recovery files every five minutes. For a separate
+smoke-only test, choose a new `RUN_ID` and run:
+
+```bash
+EVAL_MAX_HOURS=2 bash gcp/run_retrospective_exp9_exp10_exp11_exp12_evaluation.sh smoke-cloud
+```
+
+After failure, retain the original full-run `RUN_ID`, source IDs and pinned
+`REPO_REF`, and use `resume` instead of `run`. Completed tasks are reused;
+incompatible or concurrent resumes are rejected. Results are under
+`$BUCKET/$RUN_ID/analysis/`. The protocol includes download commands. No exact
+exploitability is calculated, and node exposure is reported without claiming
+equal-node comparisons. The primary comparisons are Exp10/11/12 versus Exp9
+after 24 active hours.
+
+## Experiment 14: recovering the runtime-mismatch failure
+
+The failed `exp14-cards-20261001-195256-train` deployment used Python 3.11.17
+after screening had used 3.11.16. The corrected launcher pins **3.11.16** in
+every scientific stage and reports identity mismatches before loading large
+replay files. Recovery reuses the completed screening and locked selection;
+it launches only deployment/evaluation and aggregation, not a new screening run.
+The [Experiment 14 protocol](../experiments/fhp/exp14_fhp_card_architecture/README.md#recover-the-1-october-runtime-mismatch-failure)
+explains the safeguards and remaining runtime-build check.
+
+After committing and pushing the correction, with the usual cloud variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"  # New pushed launcher commit.
+export EXP14_AUDIT_REF=54a3269f62189b8ac7190e59c9a3ea70efb4969c  # Original scientific code.
+export EXP14_PYTHON_VERSION=3.11.16
+export EXP2_RUN_ID=exp2-fhp-20260921-093839
+export RUN_ID=exp14-cards-20261001-195256
+export PARALLELISM=3
+
+# Checks saved metadata and active jobs; does not submit anything.
+bash gcp/run_exp14_card_architecture.sh check-recovery
+# Submit only when the check passes and you intend to start paid work.
+bash gcp/run_exp14_card_architecture.sh recover
+bash gcp/run_exp14_card_architecture.sh status
+```
+
+Keep the original run ID, source run and audit commit. Do not edit the saved
+manifests or selection to force compatibility. The controller uses the new
+launcher commit; scientific workers use the original audit commit and retain
+all code/data/configuration checks. Runtime mismatches are uploaded under
+`$BUCKET/$RUN_ID/diagnostics/<stage>/seed_<seed>/failure.json` (no seed component
+for selection/aggregation). A metadata-only local check does not prove the
+future VM's full interpreter build matches; the VM checks this before replay
+download. The launcher refuses recovery while another job for the run is active.
+
+For an entirely new Experiment 14 run, unset `EXP14_AUDIT_REF`, choose a new
+`RUN_ID`, keep the explicit Python patch, and use `run` instead of `recover`.
+
 ## Active Experiment 1: three-seed grouped-wide baseline
 
 The active `exp1_fhp_grouped_wide_ucv_baseline` uses a remote controller and a

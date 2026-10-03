@@ -177,6 +177,16 @@ fixed training durations; the controller covers both stages and queued waves.
 Automatic paid retries are disabled. Completed fits/evaluation tasks can be
 reused by explicit resume with unchanged source, code and configuration.
 
+All scientific stages now pin **Python 3.11.16**, rather than resolving the
+floating `3.11` version separately on each VM. `EXP14_PYTHON_VERSION` can set
+another complete `3.11.x` patch for a new run; keep it unchanged for resumption.
+Before downloading/unpickling the large source replay, a compatibility gate
+checks the saved full Python build string, PyTorch/NumPy versions, audit commit,
+audited source hash, configuration and source provenance. Deployment also
+checks the locked selection. A mismatch stops with field-level diagnostics at
+`diagnostics/<stage>/seed_<seed>/failure.json` (without the seed directory for
+selection/aggregation). The original scientific checks remain in force.
+
 Retain playable checkpoints, all analysis/evaluation and provenance. Source
 states are temporary VM inputs outside the output root. **No full training,
 replay or optimiser states are written to Experiment 14 outputs.**
@@ -186,13 +196,15 @@ After the new code has been committed and pushed, from this repository with
 
 ```bash
 export REPO_REF="$(git rev-parse HEAD)"
+unset EXP14_AUDIT_REF  # New run: scientific code and launcher use the same commit.
+export EXP14_PYTHON_VERSION=3.11.16
 export EXP2_RUN_ID="exp2-fhp-20260921-093839"
 export RUN_ID="exp14-cards-$(date -u '+%Y%m%d-%H%M%S')"
 export PARALLELISM=3
 ./gcp/run_exp14_card_architecture.sh run
 ```
 
-The launcher checks that `REPO_REF` contains Experiment 14. The laptop can
+The launcher checks that `REPO_REF` contains the runtime correction. The laptop can
 disconnect after controller submission. Check status with the same `RUN_ID`:
 
 ```bash
@@ -200,6 +212,51 @@ disconnect after controller submission. Check status with the same `RUN_ID`:
 # On failure only, preserving RUN_ID, source run and original REPO_REF:
 ./gcp/run_exp14_card_architecture.sh resume
 ```
+
+### Recover the 1 October runtime-mismatch failure
+
+For `exp14-cards-20261001-195256`, screening and selection completed with
+Python 3.11.16, but deployment resolved Python 3.11.17. **Do not use the old
+launcher or replace/delete any saved manifests.** Use the corrected launcher
+while retaining the original scientific commit. The audit hashes the commit,
+source and full runtime: simply running a new code commit against those saved
+outputs would still fail, even with the right Python patch.
+
+After committing and pushing this correction, with the usual cloud variables set:
+
+```bash
+# New pushed orchestration code, original scientific code and the same output prefix.
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP14_AUDIT_REF=54a3269f62189b8ac7190e59c9a3ea70efb4969c
+export EXP14_PYTHON_VERSION=3.11.16
+export EXP2_RUN_ID=exp2-fhp-20260921-093839
+export RUN_ID=exp14-cards-20261001-195256
+export PARALLELISM=3
+
+# Read-only cloud metadata / concurrency check; no VMs or replay downloads.
+bash gcp/run_exp14_card_architecture.sh check-recovery
+# Optional: inspect generated job specifications without submitting anything.
+bash gcp/run_exp14_card_architecture.sh recover-dry-run
+# Paid recovery: controller -> deployment/evaluation[3] -> aggregate.
+bash gcp/run_exp14_card_architecture.sh recover
+```
+
+Recovery validates all three completed screening manifests, success markers,
+source checkpoint provenance and the selection's original hashes. It never
+reruns screening or selection, and rejects other active jobs using the run ID.
+It creates uniquely named Batch jobs but reuses the existing Cloud Storage
+prefix and completed fit/evaluation artifacts. The new compatibility gate is
+embedded in the job specification, outside the original audited source tree;
+scientific workers check out `EXP14_AUDIT_REF`, while the controller checks out
+`REPO_REF`. No model architecture, fitting budget, data split, selected recipe
+or evaluation budget is changed, and no compatibility hash is bypassed.
+
+The local metadata check cannot verify a future Linux VM's interpreter build.
+Every scientific VM repeats the full runtime/code checks before source download;
+even a different build of the same patch fails closed. If that happens, inspect
+the saved/current values in `failure.json` rather than relaxing the identity
+check. Ordinary `resume` remains appropriate only when launcher and scientific
+commit are the same; use `recover` again for this preserved historical audit.
 
 Local verification without a paid cloud job:
 

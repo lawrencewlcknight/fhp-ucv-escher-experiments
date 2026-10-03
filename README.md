@@ -1056,6 +1056,28 @@ bash gcp/run_retrospective_exp7_exp9_evaluation.sh run
 
 See the protocol for status, resume, local smoke and download instructions.
 
+## Frozen-policy evaluation of Experiments 9–12
+
+The [four-way evaluation protocol](experiments/fhp/retrospective_exp9_exp10_exp11_exp12_evaluation/README.md)
+compares the cached baseline, hand/board features, betting-economics features
+and critic-only showdown features. All 48 policies receive the established
+rule-agent/LBR tests; all six experiment pairings and within-run temporal
+comparisons receive duplicate-deal head-to-head evaluation. Primary comparisons
+are Exp10/11/12 versus Exp9 at 24h. No policy is retrained or refitted.
+
+After committing and pushing, with the usual GCP variables already set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="fhp-eval9to12-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_retrospective_exp9_exp10_exp11_exp12_evaluation.sh run
+```
+
+The launcher defaults to the completed October 1 source runs listed in the
+protocol. One `n2-standard-16` VM runs cloud smoke before full scoring with 16
+processes, a 48-hour safety cap and resumable task outputs. See the protocol for
+standalone smoke, status, resume, source overrides and downloads.
+
 ## Verification
 
 ```bash
