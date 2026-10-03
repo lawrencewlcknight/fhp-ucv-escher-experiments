@@ -1078,6 +1078,30 @@ protocol. One `n2-standard-16` VM runs cloud smoke before full scoring with 16
 processes, a 48-hour safety cap and resumable task outputs. See the protocol for
 standalone smoke, status, resume, source overrides and downloads.
 
+## Frozen-policy evaluation of Experiments 7 and 8
+
+The [longer-training evaluation protocol](experiments/fhp/retrospective_exp7_exp8_evaluation/README.md)
+compares Exp7 at 24h with Exp8 at 24/30/36/42/48h across all three seeds. It
+retains the existing rule-agent/LBR framework, evaluates all ten Exp8 checkpoint
+pairings and compares each Exp8 checkpoint to the fixed Exp7 baseline. Reports
+separate the primary 24→48h gain from consecutive six-hour gains and the final
+36→48h/42→48h diagnostics. No training or policy refitting is performed.
+
+After committing and pushing, with the usual GCP variables already set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="fhp-eval78-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_retrospective_exp7_exp8_evaluation.sh run
+```
+
+The launcher defaults to `exp7-par8-20261001-005151` and
+`exp8-par48-20261001-005208`. One `n2-standard-16` runs smoke before full scoring,
+with 16 scoring processes, a 48-hour safety cap, diagnostics and resumable task
+outputs. See the protocol for standalone cloud smoke, status, resume and downloads.
+Seven charts and seed-level uncertainty help assess a late-training plateau;
+non-significant differences are not treated as proof of convergence.
+
 ## Verification
 
 ```bash

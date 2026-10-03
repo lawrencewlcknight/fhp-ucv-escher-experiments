@@ -29,6 +29,66 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Evaluation of Experiments 7 and 8: longer training and late-stage progress
+
+This evaluation-only job compares Exp7 at 24h with Exp8 at 24/30/36/42/48h,
+across all three seeds. All 18 selected policies receive the existing five-rule-agent
+and LBR tests. All ten Exp8 checkpoint pairs, plus each Exp8 checkpoint against
+the fixed Exp7 24h baseline, receive duplicate-deal head-to-head evaluation.
+The [full protocol](../experiments/fhp/retrospective_exp7_exp8_evaluation/README.md)
+describes source validation, budgets, seven charts and interpretation.
+
+After committing and pushing the new evaluation code, with the usual GCP variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP7_RUN_ID=exp7-par8-20261001-005151
+export EXP8_RUN_ID=exp8-par48-20261001-005208
+export RUN_ID="fhp-eval78-$(date -u '+%Y%m%d-%H%M%S')"
+
+# One n2-standard-16: real-checkpoint cloud smoke, then full scoring if it passes.
+bash gcp/run_retrospective_exp7_exp8_evaluation.sh run
+bash gcp/run_retrospective_exp7_exp8_evaluation.sh status
+```
+
+No training/refitting occurs. Sixteen single-threaded CPU scoring processes use
+a 48-hour elapsed safety cap (`EVAL_MAX_HOURS`, 1–72); the job stops when finished.
+The VM downloads policy files automatically; local analysis-only downloads are
+sufficient to launch. The laptop can disconnect after submission.
+
+For a **separate smoke-only job**, choose a new run ID; do not reuse the full-run prefix:
+
+```bash
+export RUN_ID="fhp-eval78-smoke-$(date -u '+%Y%m%d-%H%M%S')"
+EVAL_MAX_HOURS=2 bash gcp/run_retrospective_exp7_exp8_evaluation.sh smoke-cloud
+```
+
+Use another new run ID for the full run. Source checks validate all 36 saved
+policies, while smoke scores seed 0 at every selected checkpoint with tiny budgets.
+After a failed full evaluation, retain its original `RUN_ID`, source IDs and
+pinned `REPO_REF`, then run:
+
+```bash
+bash gcp/run_retrospective_exp7_exp8_evaluation.sh resume
+```
+
+Completed tasks are reused; concurrent or incompatible resumes are rejected.
+Task results upload every five minutes and on exit, alongside resource/failure
+diagnostics. Download analysis without the recovery cache:
+
+```bash
+FHP_EVAL_BUCKET="gs://${BUCKET#gs://}"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "${FHP_EVAL_BUCKET%/}/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+The primary endpoint is Exp8 48h versus its own 24h policy. Prespecified late-stage
+diagnostics include 48h versus 42h and versus 36h, with all consecutive six-hour
+gains also reported. Seed-level confidence intervals and rule/LBR trajectories
+support decisions about extending training. Flat estimates or non-significant
+differences do not establish equivalence or equilibrium convergence.
+
 ## Evaluation of Experiments 7 and 9: cached versus uncached critic targets
 
 This evaluation-only job scores all 24 policies (three seeds, four checkpoints
