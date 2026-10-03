@@ -108,11 +108,11 @@ def relabel_result(result, task):
     return {**result, **task, "policy_a": a, "policy_b": b}
 
 
-def evaluate(policies, config, seed, directory, workers=8, on_progress=None):
+def evaluate(policies, config, seed, directory, workers=8, on_progress=None, *, task_builder=None):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     pending, rows, reusable = [], [], {}
-    for task in build_tasks(policies, config, seed):
+    for task in (task_builder or build_tasks)(policies, config, seed):
         path = directory / f"{task['task_id']}.json"
         fingerprint = task_fingerprint(task)
         if path.exists():
@@ -171,6 +171,8 @@ def evaluate(policies, config, seed, directory, workers=8, on_progress=None):
     for name in policies:
         lbr = sorted((r for r in rows if r["kind"] == "lbr" and r["policy_b"] == name),
                      key=lambda r: r["task_id"])
+        if not lbr and config["lbr_deals"] == 0:
+            continue
         values = {key: np.concatenate([r[f"_{key}_values"] for r in lbr])
                   for key in ("paired", "player_zero", "player_one")}
         summaries.append({"arm": name, "metric": "lbr_mbb_per_hand", "seed": seed,

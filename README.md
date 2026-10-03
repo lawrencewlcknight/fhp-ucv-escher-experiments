@@ -5,6 +5,17 @@
 > job names contain `archived`. New research experiments should reuse useful
 > components without modifying these archived definitions.
 
+## Active Experiment 15: frozen policy learning-rate audit
+
+[Experiment 15](experiments/fhp/exp15_fhp_policy_learning_rate/README.md) tests
+Adam 0.0003 against 0.003 on Experiment 9's identical final frozen replay.
+Three source seeds, two matched reset initialisations, unchanged policy
+architecture and 20,000-update budget; separate held-out diagnostics and
+full-replay deployment fits. It includes rule-agent and matched head-to-head
+evaluation, with LBR optional. No UCV trajectory is retrained and no new large
+training states are retained. Use `bash gcp/run_exp15_policy_learning_rate.sh run`
+after setting the documented environment and pushing the experiment.
+
 ## Parallel implementation review
 
 The [parallel efficiency review](docs/PARALLEL_EFFICIENCY_REVIEW.md) documents
