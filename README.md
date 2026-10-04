@@ -5,6 +5,26 @@
 > job names contain `archived`. New research experiments should reuse useful
 > components without modifying these archived definitions.
 
+## Experiment 9 specialised best-response pilot
+
+Run the shared evaluation-suite pilot directly from this repository root:
+
+```bash
+export RUN_ID="fhp-br-exp9-smoke-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp9_best_response_pilot.sh smoke
+bash gcp/run_exp9_best_response_pilot.sh status
+
+# Only after the smoke job reports SUCCEEDED:
+export RUN_ID="fhp-br-exp9-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp9_best_response_pilot.sh run
+```
+
+Use the existing `PROJECT_ID`, `REGION`, `BUCKET` and `SA_EMAIL`. The launcher
+automatically supplies this checkout as the native model repository and uses
+`../../fhp-evaluation-suite` for evaluation code (override with `FHP_EVAL_REPO`
+if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
+no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
+
 ## Active Experiment 15: frozen policy learning-rate audit
 
 [Experiment 15](experiments/fhp/exp15_fhp_policy_learning_rate/README.md) tests

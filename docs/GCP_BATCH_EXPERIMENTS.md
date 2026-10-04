@@ -29,6 +29,85 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiment 9 specialised best-response pilot
+
+This evaluation-only pilot tests the frozen **24-hour, seed-0 Experiment 9** policy.
+It profiles 1/2/4/8 CPU computation threads, then compares existing LBR with the
+exact-flop response on 25 duplicate pairs using the fastest successful setting.
+The machine remains one `n2-standard-8`, the task ceiling is two hours, and no
+automatic retries are enabled. The whole-game metric remains an exploitability
+lower-bound estimate because preflop is approximate.
+
+Run from the **FHP UCV-ESCHER repository root**, with `PROJECT_ID`, `REGION`,
+`BUCKET` and `SA_EMAIL` already exported. The launcher supplies the native repo
+path automatically; `FHP_NATIVE_REPO` and `REPO_REF` are not required for this pilot.
+It delegates to the shared evaluation suite at `../../fhp-evaluation-suite`.
+If that checkout is elsewhere, set `FHP_EVAL_REPO` to its path. An absent or
+outdated checkout produces an error before submission; nothing is cloned,
+installed or pulled automatically.
+
+Preview the job and source snapshot locally, without cloud calls:
+
+```bash
+export RUN_ID="fhp-br-exp9-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp9_best_response_pilot.sh dry-run
+```
+
+The preview is saved under `outputs/batch/$RUN_ID-preview`. Use `dry-run-smoke`
+for a smoke configuration preview (`$RUN_ID-smoke-preview`). Submission artifacts
+go under `outputs/batch/$RUN_ID`, so previewing does not occupy the submit directory.
+`FHP_BATCH_OUTPUT_DIR` optionally overrides the destination. Existing output
+directories are never overwritten; no-argument invocation only prints help.
+
+First submit the separate cloud execution smoke:
+
+```bash
+export RUN_ID="fhp-br-exp9-smoke-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp9_best_response_pilot.sh smoke
+bash gcp/run_exp9_best_response_pilot.sh status
+```
+
+Wait for `SUCCEEDED`, then use a fresh ID for the pilot:
+
+```bash
+export RUN_ID="fhp-br-exp9-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp9_best_response_pilot.sh run
+bash gcp/run_exp9_best_response_pilot.sh status
+```
+
+After the 4 October Python-bootstrap correction, rerun the smoke before the
+pilot even if an earlier local test passed. Both this checkout and the shared
+`fhp-evaluation-suite` checkout must be up to date. Use fresh IDs: keep the failed
+job and its diagnostics intact. The shared bootstrap now exports a Linux PATH,
+uses Debian's Python explicitly, and logs the interpreter and failing setup
+stage. This smoke-first check is a manual prerequisite; the launcher does not
+automatically enforce or submit it.
+
+The launcher uses `python3`, or the executable named by `PYTHON`. No local neural
+network dependencies are needed to submit. Unlike the training launchers, this
+pilot uploads a hashed, source-only snapshot from the two current checkouts, so
+no pushed commit is required. The shared evaluator is not copied into this repo;
+the two launch paths use the same implementation and experiment settings.
+
+The VM fetches only the selected policy from the existing source run and verifies
+its SHA-256 before loading. Worker logs, memory samples and partial diagnostics
+are uploaded periodically and after failure. No training/resumption state is
+downloaded. You can disconnect the laptop after submission.
+
+Download to this UCV repository as usual:
+
+```bash
+FHP_EVAL_BUCKET="gs://${BUCKET#gs://}"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "${FHP_EVAL_BUCKET%/}/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+Inspect `pilot_manifest.json`, `comparison/result.json` and `SUCCESS.json`, and
+also require Batch `SUCCEEDED`. Partial files after a timeout are diagnostics,
+not final estimates. The [shared suite protocol](https://github.com/lawrencewlcknight/fhp-evaluation-suite/blob/main/docs/gcp_batch_experiments.md)
+describes all stage budgets, source verification and interpretation limits.
+
 ## Evaluation of Experiments 7 and 8: longer training and late-stage progress
 
 This evaluation-only job compares Exp7 at 24h with Exp8 at 24/30/36/42/48h,
