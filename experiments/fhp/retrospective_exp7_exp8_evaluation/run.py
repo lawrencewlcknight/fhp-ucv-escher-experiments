@@ -35,11 +35,14 @@ _portable_task = shared._portable_task
 _run_tasks = shared._run_tasks
 
 
-def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
+def discover_checkpoints(root: Path, experiment: str, *, config=None, hours=None,
+                         label=None, cache=False, allow_continuation=False) -> list[dict]:
     """Validate the complete original schedule, including policies not scored."""
     root = Path(root).resolve()
-    config = CONFIGS[experiment]
-    hours = SOURCE_HOURS[experiment]
+    custom_schedule = hours is not None
+    config = CONFIGS[experiment] if config is None else config
+    hours = SOURCE_HOURS[experiment] if hours is None else hours
+    label = EXPERIMENTS[experiment]["label"] if label is None else label
     workers_root = root / "workers"
     if not workers_root.is_dir():
         raise FileNotFoundError(f"Missing workers directory: {workers_root}")
@@ -52,7 +55,7 @@ def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
         manifest_path = worker / "run_manifest.json"
         manifest = json.loads(manifest_path.read_text())
         for key in ("experiment_name", "algorithm_id"):
-            if manifest.get(key) != EXPERIMENTS[experiment][key]:
+            if manifest.get(key) != getattr(config, key.upper()):
                 raise ValueError(f"Wrong {key}: {worker}")
         seed = manifest.get("seed")
         if type(seed) is not int or seed not in EXPECTED_SEEDS or seed in seeds:
@@ -62,13 +65,14 @@ def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
             raise ValueError(f"Not a production training run: {worker}")
         if protocol._json_safe(manifest.get("training_config")) != protocol._json_safe(config.EXPERIMENT_CONFIG):
             raise ValueError(f"Unexpected {experiment} learning configuration: {worker}")
-        if manifest.get("checkpoint_schedule") != list(config.checkpoint_schedule()):
+        schedule = config.checkpoint_schedule(total_hours=hours[-1]) if custom_schedule else config.checkpoint_schedule()
+        if manifest.get("checkpoint_schedule") != list(schedule):
             raise ValueError(f"Unexpected source checkpoint schedule: {worker}")
         if manifest.get("training_duration_seconds") != hours[-1] * 3600:
             raise ValueError(f"Unexpected source training horizon: {worker}")
         if manifest.get("game", {}).get("parameters") != protocol.FHP_GAME_PARAMETERS:
             raise ValueError(f"Wrong source game: {worker}")
-        if (worker / "continuation_source.json").exists():
+        if not allow_continuation and (worker / "continuation_source.json").exists():
             raise ValueError(f"Expected an original run, not an imported continuation: {worker}")
         if not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("repository_commit", ""))):
             raise ValueError(f"Missing or invalid source commit: {worker}")
@@ -78,7 +82,7 @@ def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
         if (runtime.get("reference_vm", {}).get("machine_type") != "n2-standard-16"
                 or runtime.get("torch_intraop_threads") != 8
                 or runtime.get("torch_interop_threads") != 8
-                or runtime.get("frozen_critic_target_cache") is not False
+                or runtime.get("frozen_critic_target_cache") is not cache
                 or runtime.get("traversal_execution") != "ray_parallel"
                 or runtime.get("parallel_settings") != config.parallel_settings()):
             raise ValueError(f"Wrong source runtime: {worker}")
@@ -117,7 +121,7 @@ def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
             if row["nodes_touched"] <= 0 or row["outer_iteration"] <= 0:
                 raise ValueError(f"Checkpoint has no completed training: {path}")
             by_hour[hour] = {
-                "experiment": experiment, "experiment_label": EXPERIMENTS[experiment]["label"],
+                "experiment": experiment, "experiment_label": label,
                 "seed": seed, "training_hours": hour, "checkpoint_id": row["checkpoint_id"],
                 "checkpoint_path": str(path), "checkpoint_sha256": observed_hash,
                 "nodes_touched": int(row["nodes_touched"]), "outer_iteration": int(row["outer_iteration"]),
@@ -126,7 +130,7 @@ def discover_checkpoints(root: Path, experiment: str) -> list[dict]:
                 "checkpoint_manifest_sha256": sha256_file(checkpoint_manifest),
                 "training_config_sha256": _digest(manifest["training_config"]),
                 "source_repository_commit": manifest["repository_commit"], "source_runtime": runtime,
-                "selected_for_evaluation": hour in EVALUATED_HOURS[experiment],
+                "selected_for_evaluation": hour in EVALUATED_HOURS.get(experiment, hours),
             }
         if tuple(sorted(by_hour)) != hours:
             raise ValueError(f"Incomplete checkpoint schedule: {worker}")

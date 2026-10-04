@@ -25,6 +25,19 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Active Experiment 16: Experiment 10 continued to 48 hours
+
+[Experiment 16](experiments/fhp/exp16_fhp_hand_board_48h/README.md) continues
+the existing three Experiment 10 trajectories from their 24h full states to
+48 cumulative active hours. The learning configuration, eight Ray actors,
+`n2-standard-16` VM per seed and original learner commit/runtime are unchanged.
+Six-hour playable policies are retained, plus only the final new resumable state.
+The workflow includes temporal crossplay and a fixed external panel (five rule
+agents, Experiment 9 at 24h and Experiment 8 at 48h), together with LBR diagnostics.
+Use `bash gcp/run_exp16_hand_board_48h.sh run` after pushing the workflow; it
+preflights source states and runs cloud smoke, continuation, aggregation and
+evaluation. No 72–96h extension is automatic.
+
 ## Active Experiment 15: frozen policy learning-rate audit
 
 [Experiment 15](experiments/fhp/exp15_fhp_policy_learning_rate/README.md) tests
