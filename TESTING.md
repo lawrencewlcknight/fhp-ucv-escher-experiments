@@ -1,5 +1,19 @@
 # Testing
 
+Experiment 17's frozen critic-budget audit:
+
+```bash
+python3 -m pytest -q tests/test_exp17_critic_budget.py
+bash gcp/run_exp17_critic_budget.sh smoke-local
+RUN_EXP17_RAY_TEST=1 python3 -m pytest -q tests/test_exp17_critic_budget.py -k native_parallel
+```
+
+Checks include native short/full fit equivalence (including temporal targets),
+unaltered full-path optimiser/RNG state, read-only recursive estimator parity
+with the actual DFS, seed-level aggregation, source/output isolation, artifact
+checksums and generated Batch scripts. The optional Ray test restores all eight
+actors and verifies the audited continuation against the untouched learner.
+
 The four experiment runners below are archived but remain runnable regression
 and reproducibility references.
 

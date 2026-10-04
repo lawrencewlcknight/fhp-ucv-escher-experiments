@@ -25,6 +25,18 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Active Experiment 17: frozen-data critic-budget audit
+
+[Experiment 17](experiments/fhp/exp17_fhp_critic_budget/README.md) compares
+5,000 versus 10,000 critic updates from the three saved Experiment 10 states.
+Three consecutive control iterations per seed provide matched frozen-data
+fits, phase timings, fresh held-out TD errors and within-history corrected
+regret variance. It evaluates the deployed four-fit averaged targets and
+preserves the normal full-fit continuation. Only diagnostics and small critic
+weights are retained, not new full states. Use
+`bash gcp/run_exp17_critic_budget.sh run` after pushing the implementation;
+the workflow includes a real-source cloud smoke and seed-level aggregation.
+
 ## Active Experiment 16: Experiment 10 continued to 48 hours
 
 [Experiment 16](experiments/fhp/exp16_fhp_hand_board_48h/README.md) continues
