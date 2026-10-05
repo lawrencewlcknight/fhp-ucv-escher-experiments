@@ -25,15 +25,15 @@ class CompactReservoirBuffer:
         *,
         device: str = "cpu",
         seed: int = 0,
+        feature_array_factory=None,
     ):
         self.buffer_size = int(buffer_size)
         self.infostate_size = int(infostate_size)
         self.action_size = int(action_size)
         self.device = str(device)
         self.rng = np.random.default_rng(int(seed))
-        self.infostate_buf = np.empty(
-            (self.buffer_size, self.infostate_size), dtype=np.float32
-        )
+        allocate = feature_array_factory or (lambda shape: np.empty(shape, dtype=np.float32))
+        self.infostate_buf = allocate((self.buffer_size, self.infostate_size))
         self.q_value_buf = np.empty(
             (self.buffer_size, self.action_size), dtype=np.float32
         )
@@ -156,6 +156,7 @@ class CompactCircularBuffer:
         *,
         device: str = "cpu",
         seed: int = 0,
+        feature_array_factory=None,
     ):
         self.buffer_size = int(buffer_size)
         self.history_size = int(history_size)
@@ -163,16 +164,11 @@ class CompactCircularBuffer:
         self.action_size = int(action_size)
         self.device = str(device)
         self.rng = np.random.default_rng(int(seed))
-        self.history_buf = np.empty(
-            (self.buffer_size, self.history_size), dtype=np.float32
-        )
+        allocate = feature_array_factory or (lambda shape: np.empty(shape, dtype=np.float32))
+        self.history_buf = allocate((self.buffer_size, self.history_size))
         self.action_buf = np.empty(self.buffer_size, dtype=np.int16)
-        self.next_history_buf = np.empty(
-            (self.buffer_size, self.history_size), dtype=np.float32
-        )
-        self.next_state_buf = np.empty(
-            (self.buffer_size, self.state_size), dtype=np.float32
-        )
+        self.next_history_buf = allocate((self.buffer_size, self.history_size))
+        self.next_state_buf = allocate((self.buffer_size, self.state_size))
         self.next_legal_actions_mask_buf = np.empty(
             (self.buffer_size, self.action_size), dtype=np.int8
         )

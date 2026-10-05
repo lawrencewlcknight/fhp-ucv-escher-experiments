@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 import torch
+from unbiased_escher.lossless_replay import feature_state, restore_features
 
 
 SCHEMA_VERSION = 1
@@ -37,7 +38,7 @@ def _reservoir_state(buffer) -> dict[str, Any]:
         "cur_id": int(buffer.cur_id),
         "size": size,
         # Views avoid doubling FHP's large replay allocation before torch.save.
-        "infostate": np.asarray(buffer.infostate_buf[:size]),
+        "infostate": feature_state(buffer.infostate_buf, size),
         "q_value": np.asarray(buffer.q_value_buf[:size]),
         "q_value_mask": np.asarray(buffer.q_value_mask_buf[:size]),
         "iteration": np.asarray(buffer.iteration_buf[:size]),
@@ -48,7 +49,7 @@ def _load_reservoir_state(buffer, state: Mapping[str, Any]) -> None:
     size = int(state["size"])
     if size > int(buffer.buffer_size):
         raise ValueError("Saved reservoir exceeds configured capacity")
-    buffer.infostate_buf[:size] = state["infostate"]
+    restore_features(buffer.infostate_buf, state["infostate"], size)
     buffer.q_value_buf[:size] = state["q_value"]
     buffer.q_value_mask_buf[:size] = state["q_value_mask"]
     buffer.iteration_buf[:size] = state["iteration"]
@@ -64,10 +65,10 @@ def _circular_state(buffer) -> dict[str, Any]:
     return {
         "cur_id": int(buffer.cur_id),
         "size": int(buffer.size),
-        "history": np.asarray(buffer.history_buf[:occupied]),
+        "history": feature_state(buffer.history_buf, occupied),
         "action": np.asarray(buffer.action_buf[:occupied]),
-        "next_history": np.asarray(buffer.next_history_buf[:occupied]),
-        "next_state": np.asarray(buffer.next_state_buf[:occupied]),
+        "next_history": feature_state(buffer.next_history_buf, occupied),
+        "next_state": feature_state(buffer.next_state_buf, occupied),
         "next_legal_actions_mask": np.asarray(
             buffer.next_legal_actions_mask_buf[:occupied]
         ),
@@ -81,10 +82,10 @@ def _load_circular_state(buffer, state: Mapping[str, Any]) -> None:
     occupied = len(state["action"])
     if occupied > int(buffer.buffer_size) or int(state["size"]) > int(buffer.buffer_size):
         raise ValueError("Saved circular replay exceeds configured capacity")
-    buffer.history_buf[:occupied] = state["history"]
+    restore_features(buffer.history_buf, state["history"], occupied)
     buffer.action_buf[:occupied] = state["action"]
-    buffer.next_history_buf[:occupied] = state["next_history"]
-    buffer.next_state_buf[:occupied] = state["next_state"]
+    restore_features(buffer.next_history_buf, state["next_history"], occupied)
+    restore_features(buffer.next_state_buf, state["next_state"], occupied)
     buffer.next_legal_actions_mask_buf[:occupied] = state["next_legal_actions_mask"]
     buffer.next_player_buf[:occupied] = state["next_player"]
     buffer.done_buf[:occupied] = state["done"]
@@ -102,7 +103,7 @@ def _calibration_state(buffer) -> dict[str, Any]:
     return {
         "cursor": int(buffer.cursor),
         "size": int(buffer.size),
-        "features": np.asarray(buffer.features[:occupied]),
+        "features": feature_state(buffer.features, occupied),
         "targets": np.asarray(buffer.targets[:occupied]),
     }
 
@@ -111,7 +112,7 @@ def _load_calibration_state(buffer, state: Mapping[str, Any]) -> None:
     occupied = len(state["targets"])
     if occupied > int(buffer.capacity) or int(state["size"]) > int(buffer.capacity):
         raise ValueError("Saved calibration replay exceeds configured capacity")
-    buffer.features[:occupied] = state["features"]
+    restore_features(buffer.features, state["features"], occupied)
     buffer.targets[:occupied] = state["targets"]
     buffer.cursor = int(state["cursor"])
     buffer.size = int(state["size"])

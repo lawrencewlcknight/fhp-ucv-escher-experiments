@@ -40,6 +40,9 @@ class GroupedSoftTargetCrossEntropyAvePolicyTrainer(AvePolicyTrainer):
         self.grouped_reduction_ratio = 0.0
 
     def _grouped_training_data(self, iteration):
+        from .lossless_replay import EncodedFeatures, grouped_training_data
+        if isinstance(self.buffer.infostate_buf, EncodedFeatures):
+            return grouped_training_data(self, iteration)
         size = min(int(self.buffer.cur_id), int(self.buffer.buffer_size))
         if size <= 0:
             raise ValueError("Cannot fit an average policy from an empty reservoir")
@@ -93,6 +96,8 @@ class GroupedSoftTargetCrossEntropyAvePolicyTrainer(AvePolicyTrainer):
         features, targets, masks, weights = self._grouped_training_data(iteration)
         size = len(features)
         full_batch = self.batch_size == -1 or self.batch_size >= size
+        if full_batch and hasattr(features, "full_batch"):
+            features = features.full_batch()
         loss = None
         for train_step in range(self.train_steps):
             if full_batch:

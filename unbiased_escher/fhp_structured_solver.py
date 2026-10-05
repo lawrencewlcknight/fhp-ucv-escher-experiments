@@ -26,7 +26,20 @@ from .grouped_wide_solver import (
     TemporallyAveragedCrossFittedQMember,
 )
 from .efficient_replay import CompactCircularBuffer, CompactReservoirBuffer
-from .solver import ResidualCalibrationTrainer
+from .solver import ResidualCalibrationTrainer, CalibrationBuffer
+from .lossless_replay import EncodedFeatures, STORAGE_ID, SUPPORTED_ENCODER
+
+
+def _feature_array_factory(encoder):
+    return EncodedFeatures if getattr(encoder, "replay_storage", "dense") == STORAGE_ID else None
+
+
+class EncodedCalibrationBuffer(CalibrationBuffer):
+    def __init__(self, capacity, feature_size, coded_columns):
+        self.capacity = int(capacity)
+        self.features = EncodedFeatures((capacity, feature_size), coded_columns=coded_columns)
+        self.targets = np.zeros(capacity, dtype=np.float32)
+        self.cursor = self.size = 0
 
 
 class _StructuredModelMixin:
@@ -68,6 +81,7 @@ class StructuredFHPRegretTrainer(_StructuredModelMixin, VRDCFRPlusRegretTrainer)
             self.output_size,
             device=self.device,
             seed=self.replay_seed,
+            feature_array_factory=_feature_array_factory(self.feature_encoder),
         )
 
 
@@ -98,6 +112,7 @@ class StructuredFHPAveragePolicyTrainer(
             self.output_size,
             device=self.device,
             seed=self.replay_seed,
+            feature_array_factory=_feature_array_factory(self.feature_encoder),
         )
 
 
@@ -129,6 +144,7 @@ class StructuredFHPQMember(
             self.output_size,
             device=self.device,
             seed=self.replay_seed,
+            feature_array_factory=_feature_array_factory(self.feature_encoder),
         )
 
 
@@ -185,6 +201,11 @@ class StructuredFHPQEnsemble(TemporallyAveragedCrossFittedQEnsemble):
 
 
 class StructuredFHPResidualCalibrationTrainer(ResidualCalibrationTrainer):
+    def init_buffer(self):
+        if _feature_array_factory(self.feature_encoder):
+            return EncodedCalibrationBuffer(self.buffer_size, self.feature_size, self.infostate_size)
+        return super().init_buffer()
+
     def __init__(
         self,
         *,
@@ -200,6 +221,7 @@ class StructuredFHPResidualCalibrationTrainer(ResidualCalibrationTrainer):
         feature_encoder: FHPFeatureEncoder,
         branch_width: int,
     ):
+        self.feature_encoder = feature_encoder
         super().__init__(
             infostate_size=infostate_size,
             action_size=action_size,
@@ -239,9 +261,15 @@ class StructuredFHPGroupedWideUCVEscher(GroupedWideUnbiasedControlVariateEscher)
         *args,
         structured_branch_width: int = 64,
         feature_encoder_id: str = ENCODER_ID,
+        replay_storage: str = "dense",
         **kwargs,
     ):
         self.feature_encoder = make_feature_encoder(feature_encoder_id)
+        if replay_storage not in ("dense", STORAGE_ID):
+            raise ValueError("Unknown replay storage format")
+        if replay_storage == STORAGE_ID and feature_encoder_id != SUPPORTED_ENCODER:
+            raise ValueError("Byte-coded replay is validated only for the Experiment 10 encoder")
+        self.feature_encoder.replay_storage = replay_storage
         self.structured_branch_width = int(structured_branch_width)
         self.feature_replay_seed = int(kwargs.get("seed", 0))
         if self.structured_branch_width <= 0:

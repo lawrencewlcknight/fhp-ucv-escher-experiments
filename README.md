@@ -25,6 +25,16 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Active Experiment 18: lossless replay memory audit
+
+[Experiment 18](experiments/fhp/exp18_fhp_lossless_replay/README.md) tests opt-in
+byte-coded feature storage, compact policy grouping and streamed continuation
+states against the unchanged Experiment 10 implementation. A single
+`n2-standard-16` runs eight-actor output/restart parity checks, paired timings
+and a populated 10-million-row capacity stress. Existing experiment defaults
+are unchanged. Use `bash gcp/run_exp18_lossless_replay.sh run` after pushing;
+only analysis and diagnostics are uploaded, not large validation states.
+
 ## Active Experiment 17: frozen-data critic-budget audit
 
 [Experiment 17](experiments/fhp/exp17_fhp_critic_budget/README.md) compares
