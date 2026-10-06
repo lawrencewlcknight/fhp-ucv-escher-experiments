@@ -138,6 +138,90 @@ gcloud storage rsync --recursive --exclude='.*task_results/.*' \
   "$BUCKET/$RUN_ID/evaluation/analysis" "cloud_outputs/$RUN_ID/evaluation/analysis"
 ```
 
+## Experiment 9 specialised best-response production follow-up
+
+This implements the fixed-budget follow-up to the 25-pair pilot. The frozen
+Experiment 9 24h policies for seeds 0, 1 and 2 each receive **2,000 new duplicate
+pairs** against both standard LBR and the specialised exact-flop responder.
+Both use the same deals; preflop remains approximate with 4,096 rollouts.
+This is evaluation-suite Experiment 5, not a new UCV training experiment.
+
+Four 500-pair shards per model run as twelve parallel Standard `n2-standard-2`
+VM tasks (24 vCPUs total), two computation threads per task. Each task has a
+four-hour ceiling and no automatic retry. Per-pair progress is saved atomically
+and uploaded every minute. Final aggregation is a separate explicitly submitted
+job. Earlier pilot outcomes are not pooled into the result.
+
+From this repo root, with `PROJECT_ID`, `REGION`, `BUCKET` and `SA_EMAIL` set,
+first run the cloud execution smoke (two pairs per shard, eight rollouts):
+
+```bash
+export RUN_ID="fhp-br-exp9-prod-smoke-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_exp9_best_response_production.sh prepare-smoke
+bash gcp/run_exp9_best_response_production.sh smoke
+bash gcp/run_exp9_best_response_production.sh status
+```
+
+After its workers job reports `SUCCEEDED`, check the complete aggregation path:
+
+```bash
+bash gcp/run_exp9_best_response_production.sh aggregate-smoke
+bash gcp/run_exp9_best_response_production.sh status
+```
+
+Only after both smoke jobs succeed, prepare and launch the full evaluation:
+
+```bash
+export RUN_ID="fhp-br-exp9-prod-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_exp9_best_response_production.sh prepare
+# Review outputs/batch/$RUN_ID/request.json and the two job.json files.
+bash gcp/run_exp9_best_response_production.sh run
+bash gcp/run_exp9_best_response_production.sh status
+```
+
+After the full workers job succeeds:
+
+```bash
+bash gcp/run_exp9_best_response_production.sh aggregate
+bash gcp/run_exp9_best_response_production.sh status
+```
+
+`prepare` is offline; all submission actions are paid GCP jobs. Smoke is a manual
+prerequisite. There is no automatic full run or aggregate submission. After each
+submission the laptop can disconnect. The launcher uses the sibling shared
+`../../fhp-evaluation-suite` checkout (`FHP_EVAL_REPO` overrides it), bundles only
+allowlisted source, and supplies this checkout for native policy loading. No
+`REPO_REF` is required. Preserve `outputs/batch/$RUN_ID`: it contains the immutable
+request, checksummed job definitions and source bundle needed for recovery.
+Prepared directories are never overwritten.
+
+If a workers job fails, diagnose it and wait until all prior attempts have
+stopped. An explicit `RECOVERY_TAG=r1 bash gcp/run_exp9_best_response_production.sh recover`
+reuses the same prepared request and uploaded pairs; it does not increase the
+sample size. Recovery refuses active attempts and altered source/job identities.
+Do not mix partial or smoke outputs with complete production results.
+
+After aggregation succeeds, download the summaries:
+
+```bash
+FHP_BUCKET_ROOT="gs://${BUCKET#gs://}"
+FHP_BUCKET_ROOT="${FHP_BUCKET_ROOT%/}"
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "$FHP_BUCKET_ROOT/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+`seed_summary.csv` gives each model's response scores and paired improvement;
+`aggregate_summary.json` and `report.md` distinguish uncertainty across three
+training seeds from Monte Carlo uncertainty conditional on those models. The
+latter averages the three models on each shared deal before forming its
+interval: the 6,000 model/pair scores are not independent. There are 12,000 hands
+per responder, 24,000 total. `shard_timings.csv` records throughput and peak
+process memory, with periodic machine/process snapshots in each remote worker
+directory. Intervals measure payoff sampling or seed variation, not the gap
+between this responder and a true full-game best response. A small response
+score does not certify Nash convergence.
+
 ## Experiment 9 specialised best-response pilot
 
 This evaluation-only pilot tests the frozen **24-hour, seed-0 Experiment 9** policy.

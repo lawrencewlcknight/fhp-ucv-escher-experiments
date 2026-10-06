@@ -25,6 +25,19 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Experiment 9 specialised best-response production evaluation
+
+The [production follow-up](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-production-follow-up)
+compares exact-flop response with standard LBR on the frozen 24h policies from
+all three Experiment 9 seeds. Each model receives 2,000 fresh duplicate pairs,
+split across four resumable shards. Twelve `n2-standard-2` Batch tasks use two
+computation threads each, 4,096 preflop rollouts and a four-hour task ceiling.
+Use `bash gcp/run_exp9_best_response_production.sh prepare` then `run` after the
+separate cloud smoke succeeds; `aggregate` is explicitly launched afterwards.
+The shared evaluation suite owns the protocol (its Experiment 5, not UCV training
+Experiment 5). No model training occurs. The result is an exploitability
+lower-bound estimate, not exact exploitability or a Nash certificate.
+
 ## Active Experiment 20: 24 hours with half the critic updates
 
 [Experiment 20](experiments/fhp/exp20_fhp_half_critic_updates/README.md) trains
