@@ -29,6 +29,54 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiment 19: continue Experiment 16 from 48 to 72 active hours
+
+This new run restores all three completed 48h full states from
+`exp16-feat48-20261004-182051`. It keeps the same learner and `n2-standard-16`
+per seed, adds checkpoints at 54/60/66/72h, and saves a final resumable 72h state.
+It does not adopt the critic-budget or replay-memory changes of Experiments 17/18.
+The original source outputs remain unchanged. See the
+[full contract and evaluation protocol](../experiments/fhp/exp19_fhp_hand_board_72h/README.md).
+
+After committing and pushing, from the repo root with the usual four GCP
+environment variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp19-feat72-$(date -u '+%Y%m%d-%H%M%S')"
+bash gcp/run_exp19_hand_board_72h.sh dry-run
+bash gcp/run_exp19_hand_board_72h.sh preflight
+
+# Optional standalone paid smoke; wait for SUCCEEDED.
+bash gcp/run_exp19_hand_board_72h.sh smoke-cloud
+bash gcp/run_exp19_hand_board_72h.sh status
+
+# Same RUN_ID reuses that successful smoke. Also runs a smoke if none exists.
+bash gcp/run_exp19_hand_board_72h.sh run
+```
+
+The cloud controller gates training on restart/capacity and second-continuation
+smoke tests, then aggregates and evaluates 48/54/60/66/72h frozen policies.
+The main contrast is 72h versus 48h; 72h versus 60h and 66h tests late improvement.
+The established fixed learned opponents, five rule agents and LBR are retained.
+Approximately 24 additional active hours per seed is not 24 elapsed hours:
+policy fitting, checkpointing, transfers and evaluation add time. Concurrent
+training requires 48 N2 vCPUs; `PARALLELISM=1` or `2` reduces concurrent VM use.
+Do not delete the source full states. No stage automatically retries paid work.
+
+You can close the laptop after submitting the controller. If only evaluation
+fails, retain the same run ID and workflow commit and use `evaluate-resume`.
+`resume` restarts the controller, not failed training. Download training and
+evaluation summaries separately:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/evaluation/analysis"
+gcloud storage rsync --recursive \
+  "$BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "$BUCKET/$RUN_ID/evaluation/analysis" "cloud_outputs/$RUN_ID/evaluation/analysis"
+```
+
 ## Experiment 9 specialised best-response pilot
 
 This evaluation-only pilot tests the frozen **24-hour, seed-0 Experiment 9** policy.

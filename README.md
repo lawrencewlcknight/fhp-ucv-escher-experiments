@@ -25,6 +25,18 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Active Experiment 19: Experiment 16 continued to 72 hours
+
+[Experiment 19](experiments/fhp/exp19_fhp_hand_board_72h/README.md) resumes the
+three completed Experiment 16 48h states for approximately 24 more active hours.
+The original learner, configuration, eight Ray actors and `n2-standard-16` per
+seed are unchanged. New policies are saved at 54/60/66/72h, with a full resumable
+state at 72h. The workflow tests second-continuation restoration, then runs
+training, aggregation and frozen-policy evaluation. Primary comparison: 72h
+versus 48h; late-stage comparisons: 72h versus 60h and 66h, plus the unchanged
+external panel and LBR. Use `bash gcp/run_exp19_hand_board_72h.sh run` after
+pushing. There is no automatic 96h extension or claim of Nash convergence.
+
 ## Active Experiment 18: lossless replay memory audit
 
 [Experiment 18](experiments/fhp/exp18_fhp_lossless_replay/README.md) tests opt-in
