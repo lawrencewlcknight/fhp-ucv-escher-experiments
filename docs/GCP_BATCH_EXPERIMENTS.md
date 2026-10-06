@@ -24,10 +24,71 @@ The end-to-end workflow is:
 9. download and verify the uploaded outputs;
 10. retain diagnostics and clean up completed Batch job records.
 
-The production runs are time-bound. They save reloadable policies at the first
+The archived production runs are time-bound. They save reloadable policies at the first
 safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
+
+## Experiment 20: 24 hours with half the critic updates
+
+This is a fresh three-seed run of Experiment 10 with only the per-critic fit
+budget changed from 10,000 to 5,000 updates. Each seed runs for 24 active hours
+on a Standard `n2-standard-16`, with eight Ray actors and unchanged central
+fitting. Four playable policies are saved at 6/12/18/24h; the final checkpoint
+also saves complete resumable training state. Training, policy fitting and
+uploads can take longer than 24 elapsed hours; the training task cap is 36h.
+No evaluation or 48h extension runs automatically. See the
+[full protocol](../experiments/fhp/exp20_fhp_half_critic_updates/README.md).
+
+After committing and pushing, with the usual four GCP environment variables:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp20-critic24-$(date -u '+%Y%m%d-%H%M%S')"
+export PARALLELISM=3
+export EXP20_TOTAL_HOURS=24
+unset EXP20_SOURCE_RUN_ID
+bash gcp/run_exp20_half_critic_updates.sh dry-run
+
+# Submit smoke only; wait for SUCCEEDED before the next step.
+bash gcp/run_exp20_half_critic_updates.sh smoke-cloud
+bash gcp/run_exp20_half_critic_updates.sh status
+
+# Same RUN_ID reuses the successful cloud smoke.
+bash gcp/run_exp20_half_critic_updates.sh run
+```
+
+The controller runs smoke -> training -> aggregation and then stops. You can
+close your laptop after submission. Concurrent seeds use 48 N2 vCPUs in total;
+reduce `PARALLELISM` to schedule fewer seed VMs at once. Failed stages are not
+automatically resubmitted. `resume` restarts only the controller, and refuses to
+restart failed training.
+
+When training and aggregation have succeeded, explicitly launch the separate
+evaluation if desired:
+
+```bash
+bash gcp/run_exp20_half_critic_updates.sh dry-run-evaluate
+bash gcp/run_exp20_half_critic_updates.sh evaluate
+```
+
+It compares all four checkpoints with the frozen historical Experiment 10
+policies using the existing five-agent, LBR and duplicate head-to-head protocol.
+The primary endpoint is 24h versus 24h. It runs on one separate `n2-standard-16`
+with a 48h elapsed cap. `evaluate-resume` reuses completed scoring tasks after
+a stopped evaluation; it does not retrain. Downloads:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/evaluation/analysis"
+gcloud storage rsync --recursive \
+  "$BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+# Run after evaluation completes:
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "$BUCKET/$RUN_ID/evaluation/analysis" "cloud_outputs/$RUN_ID/evaluation/analysis"
+```
+
+Keep the remote full training states. The experiment README documents a later,
+explicit `extend` action with a new run ID and the original training commit.
 
 ## Experiment 19: continue Experiment 16 from 48 to 72 active hours
 

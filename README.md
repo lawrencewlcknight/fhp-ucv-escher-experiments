@@ -25,6 +25,21 @@ automatically supplies this checkout as the native model repository and uses
 if installed elsewhere). It preserves the one-VM, 25-pair, two-hour pilot contract;
 no training occurs. See [the Batch guide](docs/GCP_BATCH_EXPERIMENTS.md#experiment-9-specialised-best-response-pilot).
 
+## Active Experiment 20: 24 hours with half the critic updates
+
+[Experiment 20](experiments/fhp/exp20_fhp_half_critic_updates/README.md) trains
+the Experiment 10 configuration from scratch with **5,000 instead of 10,000
+updates per critic fit**. Everything else in the production learning config is
+unchanged, including cached critic targets and hand/board features. Seeds 0–2
+run for 24 active hours each on separate `n2-standard-16` VMs with eight Ray
+workers. Policies are saved every six hours, plus a full resumable state at 24h.
+Use `bash gcp/run_exp20_half_critic_updates.sh run` after committing and pushing;
+the controller gates training on smoke/capacity checks and then aggregates.
+It does **not** launch evaluation: `evaluate` separately compares the frozen
+policies with Experiment 10 using rule agents, LBR and head-to-head play.
+No paid stage retries automatically. See the
+[Batch instructions](docs/GCP_BATCH_EXPERIMENTS.md#experiment-20-24-hours-with-half-the-critic-updates).
+
 ## Active Experiment 19: Experiment 16 continued to 72 hours
 
 [Experiment 19](experiments/fhp/exp19_fhp_hand_board_72h/README.md) resumes the
