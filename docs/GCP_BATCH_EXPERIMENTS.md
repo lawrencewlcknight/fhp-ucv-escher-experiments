@@ -29,6 +29,25 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiment 21: adversarial policy improvement with preservation
+
+See the [Experiment 21 smoke/full-run instructions](../experiments/fhp/exp21_fhp_adversarial_preservation/README.md).
+The UCV-root entry point is `bash gcp/run_exp21_adversarial_preservation.sh`.
+Unlike the legacy clone-based jobs described above, this experiment packages
+allowlisted source from this checkout and the sibling evaluation-suite checkout.
+
+Run `prepare-smoke`, then explicitly submit `qualify-smoke`, `train-smoke`,
+`evaluate-smoke` and `aggregate-smoke`, waiting for each job to succeed. Retain
+its ID in `SMOKE_RUN_ID`. With a fresh `exp21-adv-full-*` run ID, `prepare` and
+`qualify` start the three-seed feasibility stage; `train` refuses to run unless
+all attacker-strength checks pass. `evaluate` and `aggregate` are also separate
+cost-gated submissions. No job launches another paid phase automatically.
+
+Qualification/training use three `n2-standard-16` VMs; evaluation uses twelve
+`n2-standard-4` VMs. Both arrays require 48 N2 vCPUs. Qualification alone may
+finish successfully but find inadequate attackers: inspect `gate_passed`, not
+just Batch status. Original Experiment 10 checkpoints remain untouched.
+
 ## Experiment 20: 24 hours with half the critic updates
 
 This is a fresh three-seed run of Experiment 10 with only the per-critic fit

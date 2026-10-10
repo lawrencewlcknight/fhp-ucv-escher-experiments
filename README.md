@@ -38,6 +38,19 @@ The shared evaluation suite owns the protocol (its Experiment 5, not UCV trainin
 Experiment 5). No model training occurs. The result is an exploitability
 lower-bound estimate, not exact exploitability or a Nash certificate.
 
+## Active Experiment 21: adversarial policy improvement with preservation
+
+[Experiment 21](experiments/fhp/exp21_fhp_adversarial_preservation/README.md)
+post-trains the three Experiment 10 policies without changing their deployment
+architecture. It compares untouched models, compute-matched grouped fitting,
+adversarial fine-tuning, and adversarial fine-tuning with replay/KL preservation.
+Independent attacker qualification gates repair; final evaluation uses fresh
+attackers, head-to-head, frozen UCV/rule panels, LBR and full-flop response.
+Use `bash gcp/run_exp21_adversarial_preservation.sh help` from this root.
+Preparation is offline, every paid stage is explicit, and the implementation
+lives in the sibling shared evaluation suite. This is not exact exploitability
+or true-average-strategy compression. Existing UCV training defaults are untouched.
+
 ## Active Experiment 20: 24 hours with half the critic updates
 
 [Experiment 20](experiments/fhp/exp20_fhp_half_critic_updates/README.md) trains
