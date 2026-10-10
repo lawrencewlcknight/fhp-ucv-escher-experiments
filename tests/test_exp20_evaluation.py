@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from experiments.fhp.exp2_fhp_lossless_structured_ucv.worker import _config_sha256
 from experiments.fhp.exp20_fhp_half_critic_updates import evaluate as run
 from experiments.fhp.exp20_fhp_half_critic_updates.aggregate import task_name
 
@@ -31,7 +32,7 @@ def source_fixture(tmp_path, monkeypatch):
             manifest = dict(experiment_id=config.EXPERIMENT_ID, experiment_name=config.EXPERIMENT_NAME,
                             algorithm_id=config.ALGORITHM_ID, seed=seed, smoke=False,
                             training_config=deepcopy(config.EXPERIMENT_CONFIG),
-                            training_config_sha256=run._digest(config.EXPERIMENT_CONFIG),
+                            training_config_sha256=_config_sha256(config.EXPERIMENT_CONFIG),
                             repository_commit=run.candidate.BASELINE_REF if exp == "exp10" else "b" * 40,
                             execution_backend="ray_parallel", reference_vm=config.REFERENCE_VM,
                             game={"parameters": dict(run.protocol.FHP_GAME_PARAMETERS)},
@@ -92,6 +93,51 @@ def test_source_contract(tmp_path, monkeypatch):
     rows = [r for exp, root in roots.items() for r in run.discover_checkpoints(root, exp)]
     assert len(rows) == 24
     assert len({r["learning_config_without_critic_budget_sha256"] for r in rows}) == 1
+
+
+@pytest.mark.parametrize("experiment,recorded_hash", [
+    ("exp10", "065734572e18f4597dd8f494ea39230c1f193b9d68aa775138c4a8a3e39eddad"),
+    ("exp20", "8c1a01fad8f00628d283a9895ef9b7547e45f3d3b3a71dcadf410c759fc50256"),
+])
+def test_accept_recorded_training_config_hash(tmp_path, monkeypatch, experiment, recorded_hash):
+    # These hashes come from the completed production runs, not the evaluator.
+    config = run.CONFIGS[experiment].EXPERIMENT_CONFIG
+    assert _config_sha256(config) == recorded_hash
+    assert run._digest(config) != recorded_hash
+    roots = source_fixture(tmp_path, monkeypatch)
+    for worker in (roots[experiment] / "workers").glob("task_*"):
+        path = worker / "run_manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["training_config_sha256"] = recorded_hash
+        path.write_text(json.dumps(manifest))
+    assert len(run.discover_checkpoints(roots[experiment], experiment)) == 12
+
+
+@pytest.mark.parametrize("experiment", ["exp10", "exp20"])
+@pytest.mark.parametrize("bad_hash", ["missing", "corrupt", "evaluation_digest"])
+def test_reject_invalid_training_config_hash(tmp_path, monkeypatch, experiment, bad_hash):
+    roots = source_fixture(tmp_path, monkeypatch)
+    path = roots[experiment] / "workers" / task_name(0, 0) / "run_manifest.json"
+    manifest = json.loads(path.read_text())
+    if bad_hash == "missing":
+        manifest.pop("training_config_sha256")
+    else:
+        manifest["training_config_sha256"] = (
+            run._digest(manifest["training_config"]) if bad_hash == "evaluation_digest" else "0" * 64)
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match=f"Training configuration checksum mismatch for {experiment} seed 0"):
+        run.discover_checkpoints(roots[experiment], experiment)
+
+
+@pytest.mark.parametrize("experiment", ["exp10", "exp20"])
+def test_reject_changed_summary_checksum(tmp_path, monkeypatch, experiment):
+    roots = source_fixture(tmp_path, monkeypatch)
+    path = roots[experiment] / "workers" / task_name(0, 0) / "summary.json"
+    summary = json.loads(path.read_text())
+    summary["final_training_elapsed_seconds"] += 1
+    path.write_text(json.dumps(summary))
+    with pytest.raises(ValueError, match="Incomplete or incompatible source metadata"):
+        run.discover_checkpoints(roots[experiment], experiment)
 
 
 @pytest.mark.parametrize("change", ["config", "summary", "commit", "python", "threads", "smoke", "policy", "continuation", "critic"])

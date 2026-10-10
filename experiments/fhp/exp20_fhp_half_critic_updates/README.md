@@ -148,6 +148,17 @@ Completed task results are reused only if the policy, protocol, implementation
 and dependency fingerprint still matches. A running evaluation blocks a retry.
 This action does not rerun training.
 
+The original evaluator incorrectly checked saved training-configuration hashes
+using its evaluation-fingerprint serializer rather than the training code's
+compact-JSON serializer. The corrected evaluator uses the training hash function;
+checksum validation remains enforced and saved models/metadata must not be edited.
+For the affected `exp20-critic24-20261006-164357` run, validation failed before any
+evaluation manifest or scoring results were written. Set `REPO_REF` to the full
+commit SHA containing the fix, keep that `RUN_ID`, and use `evaluate-resume` to
+submit an evaluation-only retry. The successful training `-smoke` job does not
+validate this separate evaluator. Do not change `REPO_REF` when reusing existing
+scoring results: an implementation-fingerprint mismatch must still reject resume.
+
 ## Outputs and interpretation
 
 Training artifacts live at `$BUCKET/$RUN_ID/{workers,analysis}`. Analysis includes

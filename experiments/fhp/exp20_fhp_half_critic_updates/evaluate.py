@@ -10,6 +10,7 @@ import platform
 
 import numpy as np
 
+from experiments.fhp.exp2_fhp_lossless_structured_ucv.worker import _config_sha256
 from experiments.fhp.exp10_fhp_hand_board_features import config as baseline
 from experiments.fhp.retrospective_exp7_exp8_evaluation import run as long_eval
 from . import config as candidate
@@ -32,6 +33,9 @@ _run_tasks = shared._run_tasks
 
 def discover_checkpoints(root, experiment):
     config = CONFIGS[experiment]
+    # Saved training hashes use compact JSON; evaluation fingerprints use a
+    # different serialization. Validate producer metadata with the producer hash.
+    expected_config_sha256 = _config_sha256(config.EXPERIMENT_CONFIG)
     records = long_eval.discover_checkpoints(
         root, experiment, config=config, hours=EXPECTED_HOURS,
         label=EXPERIMENTS[experiment]["label"], cache=True, allow_continuation=False)
@@ -40,9 +44,13 @@ def discover_checkpoints(root, experiment):
         summary = json.loads((worker / "summary.json").read_text())
         success = json.loads((worker / "SUCCESS.json").read_text())
         runtime = json.loads((worker / "runtime_manifest.json").read_text())
+        if manifest.get("training_config_sha256") != expected_config_sha256:
+            raise ValueError(
+                f"Training configuration checksum mismatch for {experiment} seed {manifest.get('seed')} "
+                f"at {worker}: recorded={manifest.get('training_config_sha256')}, "
+                f"expected={expected_config_sha256}")
         if (manifest.get("experiment_id") != config.EXPERIMENT_ID
                 or manifest.get("training_state_retention") != "final"
-                or manifest.get("training_config_sha256") != _digest(config.EXPERIMENT_CONFIG)
                 or summary.get("status") != "complete"
                 or summary.get("seed") != manifest["seed"] or summary.get("checkpoint_count") != 4
                 or sha256_file(worker / "summary.json") != success.get("summary_sha256")):
