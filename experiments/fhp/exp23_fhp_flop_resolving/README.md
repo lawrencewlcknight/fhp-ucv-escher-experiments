@@ -1,5 +1,32 @@
 # Experiment 23 — paired gameplay with test-time flop re-solving
 
+## Current next run: two-second feasibility only
+
+The 500 ms cloud feasibility run `exp23-search-feas-20261011-200559` completed
+preparation on all 72 probes but accepted only 2/24, 0/24 and 1/24 continuations
+for seeds 0, 1 and 2. None overran the overall deadline. It stopped at the
+minimum-10%-acceptance gate, not because of a VM or memory failure.
+
+The next development run uses **two seconds per public-flop-entry solve** on
+the **same 24 positions per seed**, with the same three Exp16 models, worker
+allocation, solver, 10,000-iteration ceiling, per-iteration verification and
+safety tolerances. The extra time tests whether more computation can produce
+verified changes; acceptance alone does not establish better playing strength.
+
+`EXP23_MODE=feasibility` is now the launcher's default and never starts gameplay.
+Its search deadline is two seconds, its maximum allowed overrun rate is still
+5%, and its separate pathological-latency guard scales from one to **four
+seconds**. The latter is not extra usable search time: any continuation that
+arrives after the two-second search deadline is discarded. Every seed must
+still achieve at least 10% acceptance (at least 3 of 24 probes).
+
+The **original gameplay design below remains at 500 ms**. Passing this new
+two-second test does not approve or configure a two-second full gameplay run.
+Review the results first, then specify a modest paired gameplay pilot at the
+chosen budget; do not start the existing full panel automatically. A low
+acceptance result is useful development evidence, not proof that search cannot
+improve the policy at any compute budget.
+
 ## Question and frozen design
 
 Does a **500 ms additional public-flop solve** improve the deployed Experiment
@@ -43,7 +70,9 @@ are available at evaluation, unlike the model-free training process.
 
 ## Automatic launch gates
 
-One job runs the following automatically; no separate Stage A experiment:
+The original explicitly selected `gameplay` mode runs the following automatically;
+the current feasibility-only mode stops after diagnostics and uses the revised
+timing limits above:
 
 1. Reduced-deck independent BR differential and zero-budget simulator tests.
 2. Real checkpoint hashes, native scalar/batch/feature-reuse parity, and
@@ -75,7 +104,8 @@ Stage timings distinguish hand-space construction, public-tree construction,
 card features, neural inference, blueprint verification, solver iterations and
 candidate verification. Uninstrumented overhead is included in total latency.
 `solver_deadline_overrun` denotes the slightly shorter internal allowance;
-`deadline_overrun` denotes the overall 500 ms allowance. Only the latter defines
+`deadline_overrun` denotes the configured overall allowance (two seconds for
+feasibility, 500 ms for original gameplay). Only the latter defines
 the reported total-latency overrun rate; either can cause conservative fallback.
 
 ## Running on GCP
@@ -88,7 +118,10 @@ blueprint probabilities and retained continuations. A sequential 24-position
 seed-0 check completed every preparation, accepted 5/24 continuations, and had
 no overall 500 ms overruns. These are local engineering observations, not cloud
 throughput or playing-strength results. The unchanged gate must still pass for
-all three seeds under production concurrent load. Start with feasibility mode.
+all three seeds under production concurrent load. The subsequent optimised
+cloud run is the 2/24, 0/24, 1/24 result above: preparation improved by 16--18x,
+but the solver performed only about 64 iterations within 500 ms. The current
+two-second run tests additional computation without changing the solver.
 
 The regression tests additionally check 19,116 full feature rows bitwise against
 the native encoder, all 24 suit permutations on representative hands, native
@@ -107,7 +140,7 @@ export REGION="europe-west1"
 export BUCKET="gs://clever-overview-399515-fhp-escher-results"
 export SA_EMAIL="fhp-escher-runner@clever-overview-399515.iam.gserviceaccount.com"
 export EXP23_MODE="feasibility"
-export RUN_ID="exp23-search-feas-$(date -u '+%Y%m%d-%H%M%S')"
+export RUN_ID="exp23-search-2s-$(date -u '+%Y%m%d-%H%M%S')"
 
 # Review source and job configuration without any cloud calls:
 bash gcp/run_exp23_flop_resolving.sh prepare
@@ -129,19 +162,38 @@ phase. Neither mode includes additional training.
 `n2-standard-16` / four-process / four-thread-per-process allocation, it loads
 only the three Exp16 48h checkpoints, checks native correctness, compares legacy
 and vectorised preparation on three positions per seed at 16 fixed iterations,
-then runs the unchanged 24 timed positions per seed at 500 ms. Legacy/native
+then runs the same 24 timed positions per seed at **two seconds**. Legacy/native
 feature caches are cleared for the fixed-work comparison, and execution order
 is alternated. `preparation_profile.json` contains timings and parity results;
-`preflight.json` contains all timed probes. Gate failure retains these outputs
+`preflight.json` contains all timed probes and numerical constraint
+diagnostics: failed-probe distributions of the best maximum per-hand violation,
+iteration/check counts and stage timings. These violations are not exploitability
+estimates. `feasibility_gates.json` and `feasibility_report.md` report **every
+seed's** gate outcome, even if multiple seeds fail. Gate failure retains these outputs
 but returns failure, rather than silently declaring a successful experiment.
 `FEASIBILITY_SUCCESS.json` means the engineering checks passed, not that gameplay
 improvement was established. No `SUCCESS.json` or gameplay shards are generated.
 
-After reviewing a successful cloud feasibility run, start a **new** run ID with
-`EXP23_MODE=gameplay` and invoke `run`. That mode repeats the mandatory gates
-before paired play. Mode and source are pinned into the prepared bundle: changing
-either requires a fresh preparation/run ID. Do not recover the failed original
-bundle to obtain these changes. No automatic budget increase is implemented.
+For a one-command preparation and submission, use
+`bash gcp/run_exp23_flop_resolving.sh run` instead of the separate
+`prepare`/`submit` commands above. Do not use `run` after already preparing that
+run ID.
+
+The original full gameplay mode is still available with explicit
+`EXP23_MODE=gameplay`, but remains at 500 ms and is **not the recommended next
+run**. A two-second gameplay pilot needs a separately reviewed workload and cost
+budget. Mode, timing configuration and source are pinned into the prepared bundle:
+changes require a fresh preparation/run ID. The launcher rejects stale 500 ms
+feasibility requests before cloud submission. Do not recover the failed original
+bundle to obtain these changes; no automatic budget escalation is implemented.
+
+To download the new diagnostic report from the UCV repository root:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive \
+  "$BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
 
 Failed infrastructure attempt: once no attempt is active, reuse the original
 prepared directory/run ID, set a new `RECOVERY_TAG`, and run the wrapper's
@@ -152,7 +204,8 @@ ID. Do not use recovery to bypass failed scientific/latency gates.
 ## Outputs and interpretation
 
 `analysis/manifest.json`, `algebra_checks.json`, `native_checks.json`,
-`preflight.json`, `preparation_profile.json` (feasibility mode), `summary.json`,
+`preflight.json`, `feasibility_gates.json`, `feasibility_report.md`,
+`preparation_profile.json` (feasibility mode), `summary.json`,
 `report.md` and `matchups.csv` (gameplay mode) are compact
 analysis outputs. `analysis/task_results/` retains deal-level paired utilities,
 latencies, acceptance, fallback reasons and local verification diagnostics.

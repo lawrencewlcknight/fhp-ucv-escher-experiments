@@ -7,10 +7,11 @@ ACTION="${1:-help}"
 case "$ACTION" in
   help|-h|--help)
     echo 'Experiment 23: [prepare|run|submit|recover|status]'
-    echo 'One n2-standard-16 VM; mandatory correctness/timing checks, then paired gameplay.'
+    echo 'Default: two-second feasibility probes ONLY on one n2-standard-16 VM; no gameplay or training.'
     echo 'run prepares and submits; submit uses an existing prepared bundle; recover resumes shards.'
     echo 'Set PROJECT_ID REGION BUCKET SA_EMAIL RUN_ID. REPO_REF is deliberately unused.'
-    echo 'Set EXP23_MODE=feasibility for profiling and timed probes ONLY (recommended next run).'
+    echo 'EXP23_MODE=feasibility uses 2s; explicit gameplay retains the original 500ms protocol.'
+    echo 'Use a new run ID and prepare the new bundle; submit/recover cannot update an old bundle.'
     exit 0 ;;
   prepare|run|submit|recover|status) ;;
   *) echo 'Unknown action; use help' >&2; exit 2 ;;
