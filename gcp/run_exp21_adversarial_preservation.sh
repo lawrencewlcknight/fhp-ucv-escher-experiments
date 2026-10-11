@@ -4,7 +4,10 @@ set -Eeuo pipefail
 ACTION="${1:-help}"
 case "$ACTION" in
   help|-h|--help)
-    echo "Usage: bash gcp/run_exp21_adversarial_preservation.sh [prepare|qualify|train|evaluate|aggregate|status]"
+    echo "Usage: bash gcp/run_exp21_adversarial_preservation.sh [run|prepare-run|status]"
+    echo "run prepares and submits ONE paid job: integrated smoke, qualify, train, evaluate, aggregate."
+    echo "prepare-run is an optional offline preview; run-smoke executes only the integrated smoke."
+    echo "Legacy actions: prepare|qualify|train|evaluate|aggregate."
     echo "Add -smoke to any non-status action for the execution-only smoke."
     echo "prepare is offline; qualify/train/evaluate/aggregate each submit one paid Batch job."
     echo "Full qualify requires SMOKE_RUN_ID; full train requires all three attacker gates to pass."
@@ -23,7 +26,7 @@ if [[ "$ACTION" == status ]]; then
 fi
 ARGS=()
 if [[ "$ACTION" == *-smoke ]]; then ACTION="${ACTION%-smoke}"; ARGS+=(--smoke); fi
-case "$ACTION" in prepare|qualify|train|evaluate|aggregate) ;; *) echo 'Unknown action' >&2; exit 2 ;; esac
+case "$ACTION" in prepare-run|run|prepare|qualify|train|evaluate|aggregate) ;; *) echo 'Unknown action' >&2; exit 2 ;; esac
 : "${BUCKET:?Set BUCKET}"
 : "${SA_EMAIL:?Set SA_EMAIL}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

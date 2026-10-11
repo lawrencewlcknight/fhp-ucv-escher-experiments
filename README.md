@@ -86,9 +86,11 @@ architecture. It compares untouched models, compute-matched grouped fitting,
 adversarial fine-tuning, and adversarial fine-tuning with replay/KL preservation.
 Independent attacker qualification gates repair; final evaluation uses fresh
 attackers, head-to-head, frozen UCV/rule panels, LBR and full-flop response.
-Use `bash gcp/run_exp21_adversarial_preservation.sh help` from this root.
-Preparation is offline, every paid stage is explicit, and the implementation
-lives in the sibling shared evaluation suite. This is not exact exploitability
+Use `bash gcp/run_exp21_adversarial_preservation.sh run` with a fresh run ID:
+one Batch job runs integrated smoke, qualification, gated training, evaluation
+and aggregation without further submissions. `prepare-run` is an optional offline
+preview; implementation lives in the sibling shared evaluation suite.
+This is not exact exploitability
 or true-average-strategy compression. Existing UCV training defaults are untouched.
 
 ## Active Experiment 20: 24 hours with half the critic updates

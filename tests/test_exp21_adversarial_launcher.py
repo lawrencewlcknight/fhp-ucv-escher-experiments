@@ -12,6 +12,8 @@ SCRIPT = ROOT / "gcp/run_exp21_adversarial_preservation.sh"
 
 
 @pytest.mark.parametrize("action,stage,smoke", [
+    ("run", "run", False), ("run-smoke", "run", True),
+    ("prepare-run", "prepare-run", False), ("prepare-run-smoke", "prepare-run", True),
     ("prepare", "prepare", False), ("prepare-smoke", "prepare", True),
     ("qualify", "qualify", False), ("train-smoke", "train", True),
     ("evaluate", "evaluate", False), ("aggregate-smoke", "aggregate", True),

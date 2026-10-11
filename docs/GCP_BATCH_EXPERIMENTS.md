@@ -89,22 +89,40 @@ unfavourable scientific result. Reports are saved under `pilot_analysis/` and
 
 ## Experiment 21: adversarial policy improvement with preservation
 
-See the [Experiment 21 smoke/full-run instructions](../experiments/fhp/exp21_fhp_adversarial_preservation/README.md).
+See the [Experiment 21 single-job instructions](../experiments/fhp/exp21_fhp_adversarial_preservation/README.md).
 The UCV-root entry point is `bash gcp/run_exp21_adversarial_preservation.sh`.
 Unlike the legacy clone-based jobs described above, this experiment packages
 allowlisted source from this checkout and the sibling evaluation-suite checkout.
 
-Run `prepare-smoke`, then explicitly submit `qualify-smoke`, `train-smoke`,
-`evaluate-smoke` and `aggregate-smoke`, waiting for each job to succeed. Retain
-its ID in `SMOKE_RUN_ID`. With a fresh `exp21-adv-full-*` run ID, `prepare` and
-`qualify` start the three-seed feasibility stage; `train` refuses to run unless
-all attacker-strength checks pass. `evaluate` and `aggregate` are also separate
-cost-gated submissions. No job launches another paid phase automatically.
+With the usual `PROJECT_ID`, `REGION`, `BUCKET`, `SA_EMAIL` variables set:
 
-Qualification/training use three `n2-standard-16` VMs; evaluation uses twelve
-`n2-standard-4` VMs. Both arrays require 48 N2 vCPUs. Qualification alone may
-finish successfully but find inadequate attackers: inspect `gate_passed`, not
-just Batch status. Original Experiment 10 checkpoints remain untouched.
+```bash
+export RUN_ID="exp21-adv-full-$(date -u +%Y%m%d-%H%M%S)"
+unset FHP_BATCH_OUTPUT_DIR
+bash gcp/run_exp21_adversarial_preservation.sh run
+```
+
+This prepares, uploads and submits one `$RUN_ID-run` job. It runs integrated
+smoke -> full qualification -> gated training -> evaluation -> aggregation,
+with automatic hand-offs after each phase completes. You can disconnect once
+submission succeeds. No separate smoke commands, `SMOKE_RUN_ID`, `REPO_REF` or
+push are needed. `prepare-run` is an optional offline preview of the same job.
+
+The VM is `n2-standard-48` (200-GB disk), retaining three concurrent seed workers
+for qualification/training and twelve evaluation workers. All 48 vCPUs remain
+allocated throughout. Plan roughly 12–24 hours plus provisioning; the entire
+task has a 26-hour safety cap, not a guaranteed completion time. All three
+attacker-strength gates must pass before full training; otherwise the job stops
+with `inconclusive_qualification` in `$BUCKET/$RUN_ID/STATUS.json` and Batch state
+`FAILED`. Errors stop successors, and no paid work retries automatically.
+Original Experiment 10 checkpoints remain untouched.
+
+Use the launcher's `status` action for Batch state and `gcloud storage cat
+"$BUCKET/$RUN_ID/STATUS.json"` for the most recently uploaded phase progress.
+Successful results are under `$BUCKET/$RUN_ID/analysis/`; download only that
+directory to `cloud_outputs/$RUN_ID/analysis`. The linked README includes the
+download command and completion checks. Legacy individual-stage actions remain
+supported for old prepared runs, but must not be mixed with the new layout.
 
 ## Experiment 20: 24 hours with half the critic updates
 
