@@ -10,6 +10,7 @@ case "$ACTION" in
     echo 'One n2-standard-16 VM; mandatory correctness/timing checks, then paired gameplay.'
     echo 'run prepares and submits; submit uses an existing prepared bundle; recover resumes shards.'
     echo 'Set PROJECT_ID REGION BUCKET SA_EMAIL RUN_ID. REPO_REF is deliberately unused.'
+    echo 'Set EXP23_MODE=feasibility for profiling and timed probes ONLY (recommended next run).'
     exit 0 ;;
   prepare|run|submit|recover|status) ;;
   *) echo 'Unknown action; use help' >&2; exit 2 ;;

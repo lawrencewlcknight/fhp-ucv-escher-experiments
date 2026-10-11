@@ -61,21 +61,38 @@ Actual overruns and their incidence are reported. This does not implement a hard
 real-time service. Failed feasibility checks stop the expensive gameplay phase:
 near-universal fallback is not a negative result about the value of search.
 
-Exact card features are built once per street within a solve and reused across
-betting contexts, with no feature/model changes. The unoptimised native adapter
-is the regression reference. A real GCP timing gate remains necessary even if a
-local synthetic production-sized model meets the allowance.
+Exact card features are now constructed for the entire private-hand range with
+batched NumPy operations, once per street within a solve, and reused across
+betting contexts. Integer suit signatures reproduce the native canonicalisation;
+made-hand, kicker and board features retain their exact definitions. One native
+representative state supplies the betting context. No feature/model changes,
+hand bucketing, opponent-card inputs or cross-hand solution cache are introduced.
+The previous per-state implementation is retained as the regression reference.
+At fixed iteration counts the implementations must match; at fixed wall time the
+faster version can perform more iterations and therefore change the played policy.
+
+Stage timings distinguish hand-space construction, public-tree construction,
+card features, neural inference, blueprint verification, solver iterations and
+candidate verification. Uninstrumented overhead is included in total latency.
+`solver_deadline_overrun` denotes the slightly shorter internal allowance;
+`deadline_overrun` denotes the overall 500 ms allowance. Only the latter defines
+the reported total-latency overrun rate; either can cause conservative fallback.
 
 ## Running on GCP
 
-**Readiness warning (local engineering check, 11 October 2026):** the genuine
-Exp16 seed-0 checkpoint passed native parity checks but produced accepted
-continuations on only 2 of the 24 integration positions at 500 ms. No probe
-exceeded the allowance in that check. This is below the unchanged 10% coverage
-gate and is not evidence about gameplay quality. The implementation is ready
-for integration review, but a full paid gameplay run is not yet recommended.
-Improve finite-budget solver coverage or agree a different budget before
-treating the experiment as launch-ready; do not weaken verification to pass.
+**Engineering status (11 October 2026):** the original GCP run failed its gate:
+0/72 accepted continuations and only 24/72 completed preparations. After batched
+encoding, three local genuine seed-0 fixed-work comparisons reduced preparation
+from 312--327 ms to 20--31 ms (10--16x), with bitwise-identical reach weights,
+blueprint probabilities and retained continuations. A sequential 24-position
+seed-0 check completed every preparation, accepted 5/24 continuations, and had
+no overall 500 ms overruns. These are local engineering observations, not cloud
+throughput or playing-strength results. The unchanged gate must still pass for
+all three seeds under production concurrent load. Start with feasibility mode.
+
+The regression tests additionally check 19,116 full feature rows bitwise against
+the native encoder, all 24 suit permutations on representative hands, native
+scalar/batched inference, fixed-work solving and independent response recursion.
 
 Both checkouts must contain the new implementation. Preparation is stdlib-only
 and uploads a small **source-only, SHA-pinned bundle of both checkouts**, so a stale
@@ -89,7 +106,8 @@ export PROJECT_ID="clever-overview-399515"
 export REGION="europe-west1"
 export BUCKET="gs://clever-overview-399515-fhp-escher-results"
 export SA_EMAIL="fhp-escher-runner@clever-overview-399515.iam.gserviceaccount.com"
-export RUN_ID="exp23-search-$(date -u '+%Y%m%d-%H%M%S')"
+export EXP23_MODE="feasibility"
+export RUN_ID="exp23-search-feas-$(date -u '+%Y%m%d-%H%M%S')"
 
 # Review source and job configuration without any cloud calls:
 bash gcp/run_exp23_flop_resolving.sh prepare
@@ -103,7 +121,27 @@ read/write access to this bucket and standard Batch runtime permissions, but
 does not create child jobs or alter IAM. `run` combines prepare and submit for
 a **new** run ID. `FHP_EVALUATION_SUITE` optionally overrides the sibling path.
 The 48-hour Batch cap is a safety limit, not a training duration or runtime
-prediction. The run includes no additional training.
+prediction for gameplay mode. The feasibility job has a one-hour safety cap
+(including installation/uploads) and a ten-minute cap on the diagnostic Python
+phase. Neither mode includes additional training.
+
+**Feasibility mode never starts gameplay**, even if all checks pass. On the same
+`n2-standard-16` / four-process / four-thread-per-process allocation, it loads
+only the three Exp16 48h checkpoints, checks native correctness, compares legacy
+and vectorised preparation on three positions per seed at 16 fixed iterations,
+then runs the unchanged 24 timed positions per seed at 500 ms. Legacy/native
+feature caches are cleared for the fixed-work comparison, and execution order
+is alternated. `preparation_profile.json` contains timings and parity results;
+`preflight.json` contains all timed probes. Gate failure retains these outputs
+but returns failure, rather than silently declaring a successful experiment.
+`FEASIBILITY_SUCCESS.json` means the engineering checks passed, not that gameplay
+improvement was established. No `SUCCESS.json` or gameplay shards are generated.
+
+After reviewing a successful cloud feasibility run, start a **new** run ID with
+`EXP23_MODE=gameplay` and invoke `run`. That mode repeats the mandatory gates
+before paired play. Mode and source are pinned into the prepared bundle: changing
+either requires a fresh preparation/run ID. Do not recover the failed original
+bundle to obtain these changes. No automatic budget increase is implemented.
 
 Failed infrastructure attempt: once no attempt is active, reuse the original
 prepared directory/run ID, set a new `RECOVERY_TAG`, and run the wrapper's
@@ -114,7 +152,8 @@ ID. Do not use recovery to bypass failed scientific/latency gates.
 ## Outputs and interpretation
 
 `analysis/manifest.json`, `algebra_checks.json`, `native_checks.json`,
-`preflight.json`, `summary.json`, `report.md` and `matchups.csv` are compact
+`preflight.json`, `preparation_profile.json` (feasibility mode), `summary.json`,
+`report.md` and `matchups.csv` (gameplay mode) are compact
 analysis outputs. `analysis/task_results/` retains deal-level paired utilities,
 latencies, acceptance, fallback reasons and local verification diagnostics.
 The selected solver iteration is retained for replay diagnostics. The time cap

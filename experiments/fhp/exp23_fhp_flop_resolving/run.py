@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--suite-root", type=Path, default=ROOT.parents[1] / "fhp-evaluation-suite")
-    parser.add_argument("--input-root", required=True, help="Nine trusted, hash-pinned playable .pkl files")
+    parser.add_argument("--input-root", required=True, help="Nine trusted playable .pkl files; only three Exp16 files needed with --preflight-only")
     parser.add_argument("--output", required=True)
     parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
