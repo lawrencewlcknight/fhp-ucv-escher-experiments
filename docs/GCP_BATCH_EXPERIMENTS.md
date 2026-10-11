@@ -29,6 +29,24 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiment 22: frozen late-state critic objective audit
+
+The [complete protocol and commands](../experiments/fhp/exp22_fhp_critic_objectives/README.md)
+describe separate `smoke-cloud`, `pilot`, `aggregate-pilot`, `full` and `aggregate`
+submissions through `bash gcp/run_exp22_critic_objectives.sh`. No job automatically
+submits another. The full stage adds source seeds 1 and 2 to the completed seed-0
+pilot; aggregation verifies identical code/runtime/contracts. Preserve
+`SMOKE_RUN_ID`, `PILOT_RUN_ID` and the pushed `REPO_REF` across stages, with a fresh
+`RUN_ID` for each worker phase.
+
+Workers use `n2-standard-16` (one VM for pilot, two concurrent VMs for full),
+eight critic-fit threads and one diagnostic thread. There are no Ray actors or
+new solver trajectories beyond independent frozen-policy audit rollouts. Full
+worker process timeout is six hours; Batch ceiling eight hours; zero automatic
+retries. Source hash checks, progress logs, resource monitoring and independent
+final uploads preserve failure diagnostics. The scientific gate is manual review,
+not a p-value or an automatic promotion to longer training.
+
 ## Experiment 21: adversarial policy improvement with preservation
 
 See the [Experiment 21 smoke/full-run instructions](../experiments/fhp/exp21_fhp_adversarial_preservation/README.md).

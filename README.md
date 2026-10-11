@@ -38,6 +38,18 @@ The shared evaluation suite owns the protocol (its Experiment 5, not UCV trainin
 Experiment 5). No model training occurs. The result is an exploitability
 lower-bound estimate, not exact exploitability or a Nash certificate.
 
+## Active Experiment 22: frozen 24-hour critic objective audit
+
+[Experiment 22](experiments/fhp/exp22_fhp_critic_objectives/README.md) compares
+native replay TD, a matched-data ordinary TD control, sampling-weighted TD and
+a paired recursive corrected-regret-variance objective on frozen Experiment 10
+states. Candidates at 2,500/5,000/10,000 updates share source initialisations.
+Independent panels select candidates and assess online/deployed critic noise,
+tails and cost. Start with a real-source cloud smoke and one-seed pilot, then
+explicitly add seeds 1 and 2. No new UCV training runs or policy evaluations occur.
+Use `bash gcp/run_exp22_critic_objectives.sh help`; negative findings concern
+late-stage critic fitting only, not early training or exploitability.
+
 ## Active Experiment 21: adversarial policy improvement with preservation
 
 [Experiment 21](experiments/fhp/exp21_fhp_adversarial_preservation/README.md)
