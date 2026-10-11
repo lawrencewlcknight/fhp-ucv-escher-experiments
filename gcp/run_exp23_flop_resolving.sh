@@ -10,7 +10,8 @@ case "$ACTION" in
     echo 'Default: two-second feasibility probes ONLY on one n2-standard-16 VM; no gameplay or training.'
     echo 'run prepares and submits; submit uses an existing prepared bundle; recover resumes shards.'
     echo 'Set PROJECT_ID REGION BUCKET SA_EMAIL RUN_ID. REPO_REF is deliberately unused.'
-    echo 'EXP23_MODE=feasibility uses 2s; explicit gameplay retains the original 500ms protocol.'
+    echo 'EXP23_MODE=gameplay runs the expanded 2s / 180,000-hand study with a 24h Batch cap.'
+    echo 'Both modes use 2s. Gameplay includes preflight, paired smoke, all fixed samples and aggregation.'
     echo 'Use a new run ID and prepare the new bundle; submit/recover cannot update an old bundle.'
     exit 0 ;;
   prepare|run|submit|recover|status) ;;

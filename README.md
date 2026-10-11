@@ -52,6 +52,18 @@ After separate cloud smoke, `bash gcp/run_exp24_critic_stages.sh run` executes
 both studies and reports in one Batch job. No adaptive controller or policy
 quality claim is made; these are one-seed development studies.
 
+## Active Experiment 23: two-second flop-search gameplay evaluation
+
+[Experiment 23](experiments/fhp/exp23_fhp_flop_resolving/README.md) evaluates the
+three frozen Exp16 48h policies with two-second verified flop search. It plays
+10,000 duplicate pairs per seed against the original policy and 5,000 per seed
+against Exp8 and Exp9 with paired unchanged-policy controls: 180,000 hands.
+Set `EXP23_MODE=gameplay` and a fresh `exp23-search-full2s-*` run ID, then use
+`bash gcp/run_exp23_flop_resolving.sh run`. One `n2-standard-16` performs checks,
+separate-deal gameplay smoke, fixed-sample evaluation and aggregation under a
+24-hour Batch cap. Signed shards allow recovery; no model training or
+payoff-dependent stopping occurs. Both local checkouts are source-bundled.
+
 ## Active Experiment 22: frozen 24-hour critic objective audit
 
 [Experiment 22](experiments/fhp/exp22_fhp_critic_objectives/README.md) compares

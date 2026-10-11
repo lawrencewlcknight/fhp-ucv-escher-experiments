@@ -47,6 +47,25 @@ The unchanged reference is not trained with alternative objectives. Complete 1h/
 training states, distinct pre-fit snapshots and all audit curves are retained;
 the two studies share the same data and computation. No policy evaluation is run.
 
+## Experiment 23: expanded two-second flop-search evaluation
+
+See the [complete protocol, submission and recovery instructions](../experiments/fhp/exp23_fhp_flop_resolving/README.md).
+From this repo root, set `EXP23_MODE=gameplay`, a fresh
+`RUN_ID="exp23-search-full2s-$(date -u +%Y%m%d-%H%M%S)"`, and run
+`bash gcp/run_exp23_flop_resolving.sh run`. Existing `PROJECT_ID`, `REGION`,
+`BUCKET` and `SA_EMAIL` apply. Both this checkout and the sibling
+`fhp-evaluation-suite` must be updated; they are source-bundled by hash, not
+selected using `REPO_REF`.
+
+One `n2-standard-16` runs mandatory correctness/feasibility checks, an automatic
+paired gameplay smoke on separate deals, the fixed evaluation and aggregation.
+The three Exp16 48h models play 10,000 duplicate pairs each against their own
+unchanged policies and 5,000 each against Exp8/Exp9, with matched controls:
+180,000 evaluation hands. Search uses two seconds per flop. No training occurs.
+The gameplay deadline is 22 hours inside a 24-hour Batch cap; completed 250-pair
+shards are recoverable. Incomplete cohorts never become final results. Optional
+`EXP23_MODE=feasibility` still runs only diagnostics, not the expanded study.
+
 ## Experiment 22: frozen late-state critic objective audit
 
 The [complete protocol and commands](../experiments/fhp/exp22_fhp_critic_objectives/README.md)
