@@ -127,22 +127,28 @@ The aggregate gives selected weighted/variance minus matched-TD and best-TD
 contrasts with paired t intervals over **three source seed means**, not thousands
 of rollouts. Seed 0 alone has no seed-level confidence interval. Intervals are
 exploratory, pointwise and not corrected for multiple comparisons. Pilot seed 0
-is reused once; continuation to more seeds is a feasibility decision, not a
-significance gate. Do not change code/thresholds after inspecting the pilot and
+is used once; the one-job workflow continues after execution/checksum validation,
+not after a significance or favourable-result gate. Do not change code/thresholds after inspecting the pilot and
 then silently combine it with the remaining seeds.
 
 ## Cost and saved artefacts
 
-One `n2-standard-16` per worker: eight fitting threads, one diagnostic thread.
+The one-job workflow uses one `n2-standard-16` for all three seeds sequentially:
+eight fitting threads and one diagnostic thread per seed, with no concurrent fits.
+Each seed uses a fresh process to release the preceding source state from memory.
 Network prediction and recursive loss inputs are batched; traces use packed
 contiguous arrays and only game-depth recurrence loops in Python. Root-TD arms
 do not run networks on unused continuation nodes. Large historical replay is
 loaded once, not copied for each arm. Diagnostics run outside fitting timers.
 
-The six-hour worker-process cap and eight-hour Batch cap are **safety limits,
-not runtime forecasts**. Real-source cloud smoke has reduced panels/three updates
-and a 30-minute process cap; setup/download are additional. Inspect pilot timings
-before submitting other seeds. No retries or paid follow-on jobs start automatically.
+Each seed retains its six-hour worker-process cap; the combined Batch job has a
+24-hour cap including three seeds, downloads, setup, reporting and uploads. These
+are **safety limits, not runtime forecasts**. Real-source cloud smoke has reduced
+panels/three updates and a 30-minute process cap; setup/download are additional.
+The combined job stops immediately on a failed worker, invalid pilot, timeout or
+failed intermediate upload. It saves the pilot report before starting seed 1.
+It does not wait for human inspection or submit child jobs, and has zero retries.
+Legacy separate pilot/full jobs retain their eight-hour Batch caps.
 
 Record source download and loading, panel generation/storage, native target-cache
 construction, model/Adam initialisation, each fitting prefix, snapshot/selection cost, final-assessment cost,
@@ -163,8 +169,18 @@ sources. Partial failed jobs are diagnostic-only, never eligible for aggregation
 
 ## Run from the repository root
 
-Commit/push before cloud submission. Keep `REPO_REF` unchanged across all stages.
+Keep `REPO_REF` set to the pushed audit commit used by the successful cloud smoke.
+The combined orchestration is embedded in the locally generated Batch job, using
+the existing worker/aggregate entry points. Therefore an existing smoke at
+`cab094efad1c0ab0a194139f8cf49c3ef9fca3b6` remains valid: this launcher-only change
+does not require repeating it or changing the audit revision. The local launcher
+must include the new `run` action. Changing the audit commit does require a new
+smoke at that commit. Do not reset `REPO_REF` to a newer HEAD after smoke.
+
 Assume `PROJECT_ID`, `REGION`, `BUCKET` (`gs://...`) and `SA_EMAIL` are set.
+Keep the same terminal/session so `SMOKE_RUN_ID` and `REPO_REF` remain available.
+
+### Initial smoke (separate; skip if already succeeded)
 
 ```bash
 # Optional local execution test with tiny real FHP fixture, not scientific data.
@@ -180,32 +196,41 @@ bash gcp/run_exp22_critic_objectives.sh status
 Wait for the cloud smoke to succeed. It uses the **real** seed-0 state and full
 source dimensions; local synthetic smoke cannot unlock production.
 
-```bash
-export RUN_ID="exp22-critic-pilot-$(date -u +%Y%m%d-%H%M%S)"
-export PILOT_RUN_ID="$RUN_ID"
-bash gcp/run_exp22_critic_objectives.sh pilot
-# Wait for SUCCEEDED, then explicitly create the small pilot report:
-bash gcp/run_exp22_critic_objectives.sh aggregate-pilot
-```
-
-Review correctness, finite metrics, cost and diagnostics. If feasible, explicitly
-run seeds 1 and 2 with exactly the same settings. Reuse completed seed 0 once;
-this avoids paying for an identical repeated pilot. A new code revision requires
-a new smoke and pilot, rather than mixing revisions.
+### One command for everything after smoke
 
 ```bash
-export RUN_ID="exp22-critic-full-$(date -u +%Y%m%d-%H%M%S)"
-export PARALLELISM=2   # 1 processes the two remaining seeds sequentially
-bash gcp/run_exp22_critic_objectives.sh full
-# Wait for SUCCEEDED:
-bash gcp/run_exp22_critic_objectives.sh aggregate
+export RUN_ID="exp22-critic-audit-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp22_critic_objectives.sh run
 ```
 
-Use `status` at any stage. `dry-run` generates a job specification without cloud
-calls; `JOB_KIND` chooses smoke/pilot/full/aggregate-pilot/aggregate. There is no
-controller VM, automatic full experiment, or background polling service.
+This submits exactly one job, `$RUN_ID-run`, that performs:
 
-After the aggregation job succeeds:
+1. Download/verify the source and audit seed 0.
+2. Validate seed-0 outputs and save its report to `pilot_analysis/`.
+3. Download/verify and audit seeds 1 and 2 sequentially.
+4. Validate and aggregate all three seeds, then upload the final `analysis/`.
+
+The audit settings, update budgets, data separation and statistical comparisons
+are unchanged. No `PILOT_RUN_ID`, subsequent submission or open local terminal is
+required after submission. `PARALLELISM` does not affect this single-task mode.
+Sequential execution takes longer wall time than two simultaneous remaining-seed
+VMs, but preserves the per-seed machine allocation and avoids an idle controller
+VM, concurrent memory pressure and repeated bootstrap costs.
+
+Do not use `run` to continue a separately completed production pilot: it starts
+all three production seeds in a fresh namespace. Use the legacy staged actions
+below if a pilot already exists and should be reused.
+
+Check progress when needed:
+
+```bash
+bash gcp/run_exp22_critic_objectives.sh status
+```
+
+`dry-run` generates the combined specification without cloud calls by default;
+`JOB_KIND` can select another stage. No background polling service is used.
+
+After `$RUN_ID-run` succeeds:
 
 ```bash
 mkdir -p "cloud_outputs/$RUN_ID/analysis"
@@ -213,11 +238,21 @@ gcloud storage rsync --recursive \
   "${BUCKET%/}/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
 ```
 
-Worker panels/weights remain under `workers/seed_N/`. Aggregate downloads exclude
-large `.pt` and `.npz` artifacts. Detailed metadata retain their checksums and
+Worker panels/weights remain under `workers/seed_N/`; the pilot report remains
+under `pilot_analysis/`. Downloading `analysis/` excludes the large worker `.pt`
+and `.npz` artifacts. Detailed metadata retain their checksums and
 source locations. Read `analysis/report.md`, `summary.json`, `per_seed.json` and
 `source_manifests.json` together.
 
+### Optional legacy staged workflow
+
+For manual pilot review or to reuse an existing pilot, `pilot`, `aggregate-pilot`,
+`full` and `aggregate` remain available. Submit `pilot` using a fresh `RUN_ID` and
+save that ID as `PILOT_RUN_ID`; after success, run `aggregate-pilot`. Then set a
+new `RUN_ID`, run `full` (seeds 1/2, controlled by `PARALLELISM=1` or `2`), and after
+success run `aggregate`. Keep the same `REPO_REF` and `PILOT_RUN_ID` throughout.
+
 **Interpretation:** improvement supports further early-stage/longitudinal study,
 not stronger poker play. Failure means no demonstrated benefit in this late-stage
-screen, not that the idea cannot help earlier. Nothing is automatically promoted.
+screen, not that the idea cannot help earlier. Nothing is automatically promoted
+to a new objective, adaptive controller or full policy-training experiment.

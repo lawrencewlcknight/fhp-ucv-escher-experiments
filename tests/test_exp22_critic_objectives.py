@@ -233,7 +233,7 @@ def test_source_extractor_uses_native_features_and_does_not_start_ray(solver):
     assert extracted.calibration_trainer.target_version == solver.calibration_trainer.target_version
 
 
-@pytest.mark.parametrize("kind", ("smoke", "pilot", "full", "aggregate-pilot", "aggregate"))
+@pytest.mark.parametrize("kind", ("smoke", "run", "pilot", "full", "aggregate-pilot", "aggregate"))
 def test_batch_jobs_bash_and_limits(kind, tmp_path):
     args = Namespace(kind=kind, run_id="exp22-critic-test", bucket_root="gs://example-bucket", repo_ref="a"*40,
         service_account="runner@example.iam.gserviceaccount.com", project_id="project", region="europe-west1",
@@ -242,6 +242,11 @@ def test_batch_jobs_bash_and_limits(kind, tmp_path):
     group = job["taskGroups"][0]
     assert group["taskCount"] == (2 if kind == "full" else 1)
     assert group["taskSpec"]["maxRetryCount"] == 0
+    if kind == "run":
+        assert group["parallelism"] == 1
+        assert group["taskSpec"]["maxRunDuration"] == "86400s"
+        assert group["taskSpec"]["computeResource"] == {"cpuMilli": 16000, "memoryMib": 64000}
+        assert "batch jobs submit" not in group["taskSpec"]["runnables"][0]["script"]["text"]
     for i, runnable in enumerate(group["taskSpec"]["runnables"]):
         path = tmp_path / f"script{i}.sh"
         path.write_text(runnable["script"]["text"])

@@ -5,8 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 case "$ACTION" in
   help|-h|--help)
-    echo 'Experiment 22: [smoke-local|dry-run|smoke-cloud|pilot|aggregate-pilot|full|aggregate|status]'
-    echo 'Each cloud phase is explicit; full adds seeds 1 and 2 and reuses unchanged pilot seed 0.'
+    echo 'Experiment 22: [smoke-local|dry-run|smoke-cloud|run|status]'
+    echo 'After smoke succeeds, run submits ONE job: seed 0, pilot report, seeds 1/2, final report.'
+    echo 'Legacy staged actions remain: pilot|aggregate-pilot|full|aggregate.'
     exit 0 ;;
   smoke-local)
     exec "${PYTHON:-python3}" -m experiments.fhp.exp22_fhp_critic_objectives.run smoke \
@@ -42,10 +43,11 @@ gate() {
 }
 case "$ACTION" in
   smoke-cloud) KIND=smoke ;;
-  pilot)
+  run|pilot)
     : "${SMOKE_RUN_ID:?Set the successful cloud SMOKE_RUN_ID}"
     gate "$SMOKE_RUN_ID" smoke true
-    KIND=pilot ;;
+    [[ "$RUN_ID" != "$SMOKE_RUN_ID" ]] || { echo 'Use a fresh post-smoke RUN_ID' >&2; exit 2; }
+    KIND="$ACTION" ;;
   full)
     : "${PILOT_RUN_ID:?Set the completed PILOT_RUN_ID}"
     [[ "$RUN_ID" != "$PILOT_RUN_ID" ]] || { echo 'Full run requires a new ID' >&2; exit 2; }
@@ -59,7 +61,7 @@ case "$ACTION" in
     gate "$PILOT_RUN_ID" pilot false
     [[ "$(gcloud batch jobs describe "$RUN_ID-full" --project "$PROJECT_ID" --location "$REGION" --format='value(status.state)')" == SUCCEEDED ]] || exit 2
     KIND=aggregate ;;
-  dry-run) KIND="${JOB_KIND:-pilot}" ;;
+  dry-run) KIND="${JOB_KIND:-run}" ;;
   *) echo 'Unknown action; use help' >&2; exit 2 ;;
 esac
 JOB_DIR="$(mktemp -d /tmp/fhp-exp22-job.XXXXXX)"
@@ -67,7 +69,7 @@ JOB_DIR="$(mktemp -d /tmp/fhp-exp22-job.XXXXXX)"
   --run-id "$RUN_ID" --bucket-root "$BUCKET_ROOT" --service-account "$SA_EMAIL" --repo-ref "$REPO_REF" \
   --project-id "$PROJECT_ID" --region "$REGION" --parallelism "${PARALLELISM:-2}" --pilot-run-id "${PILOT_RUN_ID:-}"
 if [[ "$ACTION" == dry-run ]]; then echo "Prepared $JOB_DIR/job.json; nothing submitted"; exit 0; fi
-if [[ "$KIND" == smoke || "$KIND" == pilot || "$KIND" == full ]]; then
+if [[ "$KIND" == smoke || "$KIND" == run || "$KIND" == pilot || "$KIND" == full ]]; then
   # Read-only metadata/source-object checks before buying compute.
   "${PYTHON:-python3}" -m experiments.fhp.exp17_fhp_critic_budget.source --bucket "$BUCKET_ROOT"
   if gcloud storage ls "$BUCKET_ROOT/$RUN_ID/workers/" >/dev/null 2>&1; then
@@ -75,4 +77,8 @@ if [[ "$KIND" == smoke || "$KIND" == pilot || "$KIND" == full ]]; then
   fi
 fi
 gcloud batch jobs submit "$RUN_ID-$KIND" --project "$PROJECT_ID" --location "$REGION" --config "$JOB_DIR/job.json"
-echo "Submitted $RUN_ID-$KIND. No later stage will launch automatically."
+if [[ "$KIND" == run ]]; then
+  echo "Submitted $RUN_ID-run. All three seeds and reports run automatically inside this one job."
+else
+  echo "Submitted $RUN_ID-$KIND. No separate follow-on job will launch automatically."
+fi

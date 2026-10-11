@@ -45,8 +45,10 @@ native replay TD, a matched-data ordinary TD control, sampling-weighted TD and
 a paired recursive corrected-regret-variance objective on frozen Experiment 10
 states. Candidates at 2,500/5,000/10,000 updates share source initialisations.
 Independent panels select candidates and assess online/deployed critic noise,
-tails and cost. Start with a real-source cloud smoke and one-seed pilot, then
-explicitly add seeds 1 and 2. No new UCV training runs or policy evaluations occur.
+tails and cost. After the separate real-source cloud smoke, use
+`bash gcp/run_exp22_critic_objectives.sh run` to submit one job that runs the seed-0
+pilot, writes its report, audits seeds 1 and 2 sequentially and aggregates all
+three. No new UCV training runs or policy evaluations occur.
 Use `bash gcp/run_exp22_critic_objectives.sh help`; negative findings concern
 late-stage critic fitting only, not early training or exploitability.
 

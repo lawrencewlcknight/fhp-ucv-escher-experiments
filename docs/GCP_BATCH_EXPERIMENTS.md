@@ -32,20 +32,23 @@ fitting, checkpoint serialization, diagnostics, and upload.
 ## Experiment 22: frozen late-state critic objective audit
 
 The [complete protocol and commands](../experiments/fhp/exp22_fhp_critic_objectives/README.md)
-describe separate `smoke-cloud`, `pilot`, `aggregate-pilot`, `full` and `aggregate`
-submissions through `bash gcp/run_exp22_critic_objectives.sh`. No job automatically
-submits another. The full stage adds source seeds 1 and 2 to the completed seed-0
-pilot; aggregation verifies identical code/runtime/contracts. Preserve
-`SMOKE_RUN_ID`, `PILOT_RUN_ID` and the pushed `REPO_REF` across stages, with a fresh
-`RUN_ID` for each worker phase.
+describe a separate `smoke-cloud`, followed by one submission:
+`bash gcp/run_exp22_critic_objectives.sh run`. This single job runs the seed-0
+pilot, saves its report, runs seeds 1 and 2 sequentially, and aggregates all three.
+It never submits child jobs. Preserve the successful `SMOKE_RUN_ID` and its pushed
+`REPO_REF`, and choose a fresh `RUN_ID`. The locally generated orchestration uses
+existing audit entry points, so a successful smoke at the original audit commit
+remains valid without rerunning it. Legacy staged actions remain available.
 
-Workers use `n2-standard-16` (one VM for pilot, two concurrent VMs for full),
-eight critic-fit threads and one diagnostic thread. There are no Ray actors or
-new solver trajectories beyond independent frozen-policy audit rollouts. Full
-worker process timeout is six hours; Batch ceiling eight hours; zero automatic
-retries. Source hash checks, progress logs, resource monitoring and independent
-final uploads preserve failure diagnostics. The scientific gate is manual review,
-not a p-value or an automatic promotion to longer training.
+The combined job uses one `n2-standard-16`, eight critic-fit threads and one
+diagnostic thread. Fresh worker subprocesses release source-state memory between
+seeds. There are no Ray actors or new solver trajectories beyond independent
+frozen-policy audit rollouts. Each seed retains a six-hour process timeout; the
+whole Batch job has a 24-hour safety cap and zero retries. Source hash checks,
+progress logs, resource monitoring and independent final uploads preserve failure
+diagnostics. The job stops on errors or invalid pilot outputs, not on an
+unfavourable scientific result. Reports are saved under `pilot_analysis/` and
+`analysis/`; no follow-up submission is required.
 
 ## Experiment 21: adversarial policy improvement with preservation
 
