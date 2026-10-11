@@ -38,6 +38,20 @@ The shared evaluation suite owns the protocol (its Experiment 5, not UCV trainin
 Experiment 5). No model training occurs. The result is an exploitability
 lower-bound estimate, not exact exploitability or a Nash certificate.
 
+## Active Experiments 24 and 25: pre-fit critic budgets and objective generalisation
+
+[Experiment 24](experiments/fhp/exp24_fhp_critic_budget_stages/README.md) generates
+one unchanged six-hour Experiment 10 reference seed, saving full 1h/6h states
+and pre-fit snapshots. It also captures a comparable boundary one iteration
+after the historical 24h seed-0 state. Native TD budgets include 0, 100, 500,
+1,000, 2,500, 5,000 and 10,000 updates.
+[Experiment 25](experiments/fhp/exp25_fhp_critic_objective_generalisation/README.md)
+reuses these states to inspect matched-data TD, weighted TD and corrected-regret
+variance, including full fixed-fit-panel and independent assessment curves.
+After separate cloud smoke, `bash gcp/run_exp24_critic_stages.sh run` executes
+both studies and reports in one Batch job. No adaptive controller or policy
+quality claim is made; these are one-seed development studies.
+
 ## Active Experiment 22: frozen 24-hour critic objective audit
 
 [Experiment 22](experiments/fhp/exp22_fhp_critic_objectives/README.md) compares

@@ -60,7 +60,7 @@ def source_identity(solver):
                 iteration=solver.num_iteration, nodes=solver.nodes_touched, episode=solver.episode)
 
 
-def audit(solver, directory, config, seed):
+def audit(solver, directory, config, seed, *, candidate_diagnostics=None):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     original = source_identity(solver)
@@ -94,6 +94,9 @@ def audit(solver, directory, config, seed):
                     evaluation_model.load_state_dict(candidate[representation])
                     metrics["selection"][representation] = assess(
                         evaluation_model, split_panels["selection"], config["evaluation_batch_size"])
+                if candidate_diagnostics is not None:
+                    metrics["fixed_fit_panel"] = candidate_diagnostics(
+                        candidate, evaluation_model, split_panels["fit"], member, solver.num_iteration, config)
             finally:
                 torch.set_num_threads(config["fit_threads"])
 
@@ -105,7 +108,7 @@ def audit(solver, directory, config, seed):
             fitted = fit_objective(member, solver.num_iteration, split_panels["fit"], objective,
                                    config, seed=seed, fold=fold, callback=candidate_callback)
             for row in fitted:
-                data_cost = (0. if objective == "replay_td" else
+                data_cost = (0. if objective == "replay_td" or row["updates"] == 0 else
                              panels[f"{fold}/fit"]["generation_seconds"] + panels[f"{fold}/fit"]["save_seconds"])
                 # Conservatively charge the entire shared panel cost to each method,
                 # not a quarter just because the experimental implementation shares it.

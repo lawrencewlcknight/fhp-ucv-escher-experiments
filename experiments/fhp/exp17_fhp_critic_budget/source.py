@@ -19,10 +19,12 @@ def checked_bucket(bucket):
     return bucket
 
 
-def preflight(bucket):
+def preflight(bucket, seeds=SEEDS):
     bucket = checked_bucket(bucket)
     records = []
-    for seed in SEEDS:
+    if not seeds or any(seed not in SEEDS for seed in seeds):
+        raise ValueError("Unexpected source seeds")
+    for seed in seeds:
         uri = f"{bucket}/{SOURCE_RUN_ID}/workers/{worker_name(seed)}"
         raw = {name: subprocess.check_output(["gcloud", "storage", "cat", f"{uri}/{name}"])
                for name in METADATA_FILES}
@@ -84,4 +86,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Metadata-only preflight; no local ML dependencies required")
     parser.add_argument("--bucket", required=True)
-    print(json.dumps(preflight(parser.parse_args().bucket), indent=2))
+    parser.add_argument("--seed", type=int, choices=SEEDS,
+                        help="Optionally check one source only; default retains all three")
+    args = parser.parse_args()
+    print(json.dumps(preflight(args.bucket, SEEDS if args.seed is None else (args.seed,)), indent=2))

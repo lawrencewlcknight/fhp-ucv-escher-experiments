@@ -29,6 +29,24 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiments 24 and 25: pre-fit critic stage studies
+
+See the [complete protocol, smoke/full commands and downloads](../experiments/fhp/exp24_fhp_critic_budget_stages/README.md).
+Commit and push first, pin `REPO_REF`, and run
+`bash gcp/run_exp24_critic_stages.sh smoke-cloud` with a fresh `exp24-critic-smoke-*`
+ID. Retain it as `SMOKE_RUN_ID`. Once succeeded, a fresh `exp24-critic-stages-*`
+ID plus `bash gcp/run_exp24_critic_stages.sh run` submits **one job**: real late-state
+boundary, six-hour reference, reload check, all three stage audits, and separate
+Experiment 24/25 reports. Standard environment variables apply; global
+`PARALLELISM` is ignored. There are no child jobs or manual intermediate gates.
+
+One `n2-standard-16`, eight traversal actors, eight fitting threads; diagnostics
+use one thread. Zero retries, 250 GB disk, 24-hour production safety cap. Smoke
+uses a tiny fresh reference but a real native late iteration, so is not instantaneous.
+The unchanged reference is not trained with alternative objectives. Complete 1h/6h
+training states, distinct pre-fit snapshots and all audit curves are retained;
+the two studies share the same data and computation. No policy evaluation is run.
+
 ## Experiment 22: frozen late-state critic objective audit
 
 The [complete protocol and commands](../experiments/fhp/exp22_fhp_critic_objectives/README.md)

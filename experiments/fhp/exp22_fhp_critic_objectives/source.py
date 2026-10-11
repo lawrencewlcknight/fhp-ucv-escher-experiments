@@ -9,13 +9,22 @@ from experiments.fhp.exp17_fhp_critic_budget.config import TRAINING_REF
 def extract_solver(payload):
     from experiments.fhp.exp10_fhp_hand_board_features import config as baseline
     from experiments.fhp.exp10_fhp_hand_board_features.training_state import STATE_TYPE
-    from experiments.fhp.exp2_fhp_lossless_structured_ucv.worker import _solver_kwargs
-    from unbiased_escher.fhp_structured_solver import StructuredFHPGroupedWideUCVEscher
-    from experiments.fhp.exp10_fhp_hand_board_features.diagnostics import install_cache
     if (payload.get("type") != STATE_TYPE or payload.get("repository_commit") != TRAINING_REF
             or payload.get("checkpoint_id") != "time_24h" or payload.get("seed") not in (0, 1, 2)
             or payload.get("config") != baseline.EXPERIMENT_CONFIG):
         raise ValueError("Expected exact frozen Experiment 10 final-state identity/configuration")
+    return extract_verified_snapshot(payload)
+
+
+def extract_verified_snapshot(payload):
+    """Internal extractor; callers must validate identity/config/hash first.
+
+    Shared by the pre-fit audit without weakening Experiment 22's strict loader.
+    No actors are started and no original replay arrays are modified.
+    """
+    from experiments.fhp.exp2_fhp_lossless_structured_ucv.worker import _solver_kwargs
+    from unbiased_escher.fhp_structured_solver import StructuredFHPGroupedWideUCVEscher
+    from experiments.fhp.exp10_fhp_hand_board_features.diagnostics import install_cache
     if len(payload["q_ensemble"]["members"]) != 2:
         raise ValueError("Expected two cross-fitted critics")
     small = deepcopy(payload["config"])

@@ -1,5 +1,6 @@
 """Matched native initialisations; candidates are prefixes, never sequential target refreshes."""
 from copy import deepcopy
+from collections import deque
 import hashlib
 import time
 
@@ -18,10 +19,13 @@ def optimizer_hash(state):
         if torch.is_tensor(value):
             digest.update(str((tuple(value.shape), value.dtype)).encode())
             digest.update(value.detach().cpu().numpy().tobytes())
+        elif isinstance(value, np.ndarray):
+            digest.update(str((tuple(value.shape), value.dtype)).encode())
+            digest.update(np.ascontiguousarray(value).tobytes())
         elif isinstance(value, dict):
             for key in sorted(value, key=str):
                 digest.update(repr(key).encode()); visit(value[key])
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, (list, tuple, deque)):
             for item in value:
                 visit(item)
         else:
@@ -38,14 +42,38 @@ def fit_objective(member, iteration, panel, objective, config, *, seed, fold, ca
     initial_hash = weight_hash(cpu_state(model))
     initial_optimizer_hash = optimizer_hash(optimizer.state_dict())
     rng = np.random.default_rng(np.random.SeedSequence([config["random_seed"], seed, fold, 91]))
+    if objective == "replay_td" and config.get("native_replay_rng", False):
+        rng.bit_generator.state = deepcopy(member.buffer.rng.bit_generator.state)
     history = deepcopy(member.target_history)
     initialization_seconds = time.perf_counter()-started
     minibatch_digest = hashlib.sha256()
     network_rows = root_traces = 0
+    records = []
+    # A zero budget is a genuine no-op: no target cache and, crucially, no
+    # history append / deployment refresh. Diagnostic cloning is charged apart.
+    if 0 in config["updates"]:
+        snapshot_started = time.perf_counter()
+        online, deployed = cpu_state(member.model), cpu_state(member.target_model)
+        candidate = dict(objective=objective, updates=0, member=fold, online=online,
+                         deployed=deployed, optimizer=deepcopy(optimizer.state_dict()),
+                         sampler_rng=deepcopy(rng.bit_generator.state),
+                         type="diagnostic_critic_not_resumable_solver")
+        metrics = dict(objective=objective, updates=0, member=fold, loss=None, gradient_norm=None,
+                       initial_online_sha256=initial_hash, initial_optimizer_sha256=initial_optimizer_hash,
+                       online_sha256=weight_hash(online), deployed_sha256=weight_hash(deployed),
+                       fit_prefix_seconds=0., target_cache_seconds=0.,
+                       initialization_seconds=initialization_seconds,
+                       minibatch_stream_sha256=minibatch_digest.hexdigest(),
+                       cumulative_root_traces=0, cumulative_online_input_rows=0,
+                       batch_root_traces=0, target_average_window=member.target_average_window)
+        callback(candidate, metrics)
+        duration = time.perf_counter()-snapshot_started
+        metrics["snapshot_and_selection_seconds"] = duration
+        overhead += duration
+        records.append(metrics)
     cache_started = time.perf_counter()
     targets = build_target_cache(member, iteration) if objective == "replay_td" else None
     cache_seconds = time.perf_counter()-cache_started
-    records = []
     for step in range(1, max(config["updates"])+1):
         if objective == "replay_td":
             size = len(member.buffer)
