@@ -52,6 +52,16 @@ After separate cloud smoke, `bash gcp/run_exp24_critic_stages.sh run` executes
 both studies and reports in one Batch job. No adaptive controller or policy
 quality claim is made; these are one-seed development studies.
 
+## Active Experiment 26: attacker learning diagnostic
+
+[Experiment 26](experiments/fhp/exp26_fhp_attacker_diagnostic/README.md) investigates
+why Experiment 21's attackers failed qualification. On the frozen Exp10 seed-0
+policy, it runs correctness checks, four attacker learning curves through 60
+minutes, development-only selection and independent paired assessment. One
+`n2-standard-8`, six-hour safety cap, no policy repair or gate relaxation.
+Use `bash gcp/run_exp26_attacker_diagnostic.sh run-smoke`, then a fresh run ID
+with `run` after reviewing the smoke. Both repositories are source-bundled.
+
 ## Active Experiment 23: two-second flop-search gameplay evaluation
 
 [Experiment 23](experiments/fhp/exp23_fhp_flop_resolving/README.md) evaluates the

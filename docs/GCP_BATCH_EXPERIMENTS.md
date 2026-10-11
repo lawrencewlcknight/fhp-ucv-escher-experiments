@@ -87,6 +87,17 @@ diagnostics. The job stops on errors or invalid pilot outputs, not on an
 unfavourable scientific result. Reports are saved under `pilot_analysis/` and
 `analysis/`; no follow-up submission is required.
 
+## Experiment 26: attacker correctness and learning curves
+
+See the [Experiment 26 smoke/full instructions](../experiments/fhp/exp26_fhp_attacker_diagnostic/README.md).
+With the standard environment variables set, use a fresh
+`exp26-attack-smoke-*` ID and `bash gcp/run_exp26_attacker_diagnostic.sh run-smoke`.
+After reviewing that smoke, use a fresh `exp26-attack-full-*` ID and
+`bash gcp/run_exp26_attacker_diagnostic.sh run`. One `n2-standard-8` runs checks,
+one-hour attacker learning curves on Exp10 seed 0, independent evaluation and
+reporting. Six-hour full-job cap; no UCV repair or automatic follow-up. Both
+local checkouts are source-bundled, not selected using `REPO_REF`.
+
 ## Experiment 21: adversarial policy improvement with preservation
 
 See the [Experiment 21 single-job instructions](../experiments/fhp/exp21_fhp_adversarial_preservation/README.md).
