@@ -26,6 +26,9 @@ include = [
 ]
 exclude = ["outputs*", "tests*"]
 
+[tool.setuptools.package-data]
+fhp_escher = ["data/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

@@ -1,5 +1,14 @@
 # FHP UCV-ESCHER Experiments
 
+## Experiments 29–33: additive strategic features
+
+Five separate 24-active-hour, three-seed experiments add relative strength,
+opponent-class profiles, blockers, preflop distributions or strength–betting
+interactions to Experiment 10. Each automatically evaluates against the archived
+Experiment 10 policies without retraining the baseline, retains playable policies
+every six hours and saves one final resumable state per seed. See the
+[configuration, feature definitions and launch guide](experiments/fhp/strategic_feature_suite/README.md).
+
 > **Archive status:** The former Experiments 1–4 are retained as runnable historical
 > references. Their package names, run identities, checkpoint prefixes, and GCP
 > job names contain `archived`. New research experiments should reuse useful

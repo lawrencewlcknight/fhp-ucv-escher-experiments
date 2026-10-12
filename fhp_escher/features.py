@@ -415,6 +415,10 @@ def make_feature_encoder(encoder_id=ENCODER_ID):
     from .critic_showdown_features import FHPCriticShowdownFeatureEncoder
     if encoder_id == FHPCriticShowdownFeatureEncoder.encoder_id:
         return FHPCriticShowdownFeatureEncoder()
+    from .strategic_features import ENCODER_IDS, StrategicFeatureEncoder
+    for kind, identifier in ENCODER_IDS.items():
+        if encoder_id == identifier:
+            return StrategicFeatureEncoder(kind)
     raise ValueError(f"Unsupported FHP feature encoder ID: {encoder_id!r}")
 
 
