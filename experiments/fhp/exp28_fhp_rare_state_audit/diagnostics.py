@@ -1,6 +1,7 @@
 """Read-only case evaluation and exact expectation of the native terminal estimator."""
 from copy import deepcopy
 from contextlib import contextmanager
+import json
 import numpy as np
 import torch
 
@@ -118,12 +119,29 @@ def estimator_probe(solver,panel,config,seed):
                             legal_actions_mask=mask).advantages)
                     samples=np.asarray(estimates)
                     mean=proposal[legal]@samples
-                    exact=np.zeros(3);exact[legal]=returns-float(pi[legal]@returns)
+                    # The native estimator masks and renormalises the policy in
+                    # float64. Regret matching returns float32 probabilities,
+                    # whose legal mass can differ slightly from one. Centre the
+                    # independent reference identically, without changing the
+                    # raw policy passed to the estimator or the frozen sampler.
+                    legal_policy=np.where(mask>0,np.asarray(pi,dtype=np.float64),0.)
+                    policy_mass=float(legal_policy.sum())
+                    legal_policy=legal_policy/policy_mass
+                    exact=np.zeros(3);exact[legal]=returns-float(legal_policy[legal]@returns)
                     error=float(np.max(np.abs(mean-exact)))
-                    if error>1e-9:
-                        raise ValueError("Native corrected-estimator expectation mismatch")
+                    if not np.isfinite(error) or error>1e-9:
+                        # The runner persists this message and traceback in
+                        # failure.json, including when no probe report is saved.
+                        details=dict(case_id=r["id"],seat=player,opponent=list(other),fold=fold,
+                            policy=pi.tolist(),policy_legal_mass=policy_mass,
+                            normalised_policy=legal_policy.tolist(),legal_actions=legal.tolist(),
+                            proposal=proposal.tolist(),q=q.tolist(),returns=returns.tolist(),
+                            sampled_action_estimates=samples.tolist(),mean_advantage=mean.tolist(),
+                            expected_advantage=exact.tolist(),expectation_max_error=error,tolerance=1e-9)
+                        raise ValueError("Native corrected-estimator expectation mismatch: "+json.dumps(details,sort_keys=True))
                     variance=proposal[legal]@((samples-mean)**2)
                     histories.append(dict(opponent=list(other),fold=fold,policy=pi.tolist(),proposal=proposal.tolist(),
+                        policy_legal_mass=policy_mass,normalised_policy=legal_policy.tolist(),
                         q=q.tolist(),sampled_action_estimates=samples.tolist(),expected_advantage=exact.tolist(),
                         action_variance=variance.tolist(),expectation_max_error=error,
                         call_minus_fold_bb=float((returns[1]-returns[0])*solver.max_utility/100)))

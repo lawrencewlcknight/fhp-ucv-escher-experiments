@@ -1,6 +1,7 @@
 """Coverage, native-estimator algebra, isolation, matched refits and Batch gates."""
 from argparse import Namespace
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 from itertools import combinations
 import json
@@ -166,6 +167,70 @@ def test_frozen_probe_uses_actual_corrected_estimator_and_preserves_source(panel
         for h in row["histories"]:
             assert h["expectation_max_error"]<1e-9
             assert h["call_minus_fold_bb"]>0
+    assert source_identity(solver)==before
+    assert optimizer_hash(solver._capture_rng_state())==rng
+
+
+@pytest.mark.parametrize("scores",[(1.,9.,0.),(2.,8.,0.),(1.,2.,0.)])
+def test_frozen_probe_normalises_float32_reference_without_changing_estimator(panel,monkeypatch,scores):
+    solver=synthetic_solver(4)
+    raw=solver.regret_trainers[0].regret_matching(np.array(scores,dtype=np.float32),[0,1])
+    saved=raw.copy()
+    assert raw.dtype==np.float32
+    mass=float(raw.astype(np.float64).sum())
+    assert abs(mass-1)>1e-9  # Includes both below-one and above-one rounding.
+    for trainer in solver.regret_trainers:
+        monkeypatch.setattr(trainer,"get_policy",lambda state,iteration:raw)
+    before=source_identity(solver);rng=optimizer_hash(solver._capture_rng_state())
+    result=estimator_probe(solver,panel,contract(True),4)
+    old_errors=[]
+    for row in result["rows"]:
+        state=from_case(next(r for r in panel["rows"] if r["id"]==row["case_id"]))
+        returns=np.array([state.child(a).returns()[state.current_player()]/solver.max_utility for a in (0,1)])
+        for h in row["histories"]:
+            np.testing.assert_array_equal(h["policy"],saved.astype(np.float64))
+            assert h["policy_legal_mass"]==mass
+            normalised=saved.astype(np.float64)/mass
+            np.testing.assert_array_equal(h["normalised_policy"],normalised)
+            mean=np.asarray(h["proposal"])[:2]@np.asarray(h["sampled_action_estimates"])
+            exact=np.zeros(3);exact[:2]=returns-normalised[:2]@returns
+            np.testing.assert_allclose(mean,exact,rtol=0,atol=1e-12)
+            np.testing.assert_allclose(h["expected_advantage"],exact,rtol=0,atol=1e-12)
+            old_exact=returns-saved.astype(np.float64)[:2]@returns
+            old_errors.append(float(np.max(np.abs(mean[:2]-old_exact))))
+            assert h["expectation_max_error"]<1e-12
+    assert max(old_errors)>1e-9  # This regression would fail the original audit.
+    np.testing.assert_array_equal(raw,saved)
+    assert source_identity(solver)==before
+    assert optimizer_hash(solver._capture_rng_state())==rng
+
+
+@pytest.mark.parametrize("corruption",[1e-6,np.nan])
+def test_frozen_probe_still_rejects_estimator_errors_and_reports_context(panel,monkeypatch,corruption):
+    from experiments.fhp.exp28_fhp_rare_state_audit import diagnostics
+    solver=synthetic_solver(4)
+    native=diagnostics.control_variate_advantage
+    def corrupted(*args,**kwargs):
+        estimate=native(*args,**kwargs)
+        advantages=estimate.advantages.copy()
+        advantages[0]+=corruption
+        return replace(estimate,advantages=advantages)
+    monkeypatch.setattr(diagnostics,"control_variate_advantage",corrupted)
+    before=source_identity(solver);rng=optimizer_hash(solver._capture_rng_state())
+    with pytest.raises(ValueError,match="Native corrected-estimator expectation mismatch:") as exc:
+        estimator_probe(solver,panel,contract(True),4)
+    details=json.loads(str(exc.value).split(": ",1)[1])
+    assert details["tolerance"]==1e-9
+    assert details["case_id"] in {r["id"] for r in panel["rows"]}
+    assert details["seat"] in (0,1) and details["fold"] in (0,1)
+    assert len(details["opponent"])==2 and details["legal_actions"]==[0,1]
+    for key in ("policy","normalised_policy","proposal","q","mean_advantage","expected_advantage"):
+        assert len(details[key])==3
+    assert len(details["returns"])==2
+    if np.isfinite(corruption):
+        assert details["expectation_max_error"]==pytest.approx(corruption)
+    else:
+        assert not np.isfinite(details["expectation_max_error"])
     assert source_identity(solver)==before
     assert optimizer_hash(solver._capture_rng_state())==rng
 

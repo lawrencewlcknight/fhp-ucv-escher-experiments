@@ -58,6 +58,13 @@ repeating the frozen protocol for seeds 1 and 2. This gate tests correctness,
 not whether the scientific result is positive. No manual intermediate
 submissions are needed.
 
+The estimator reference masks and renormalises legal policy probabilities in
+float64, matching the native estimator's centring without modifying its inputs.
+The absolute expectation tolerance remains `1e-9`; non-finite discrepancies also
+fail. Probe records retain raw and normalised policies. On a mismatch,
+`failure.json` includes numerical context in the error/traceback: the case,
+hidden hand, critic fold, policy mass, proposal, returns and both expectations.
+
 ## Target weighting and assessment safeguards
 
 - Target only existing quads/straight-flush replay groups where folding is legal,
