@@ -87,6 +87,17 @@ diagnostics. The job stops on errors or invalid pilot outputs, not on an
 unfavourable scientific result. Reports are saved under `pilot_analysis/` and
 `analysis/`; no follow-up submission is required.
 
+## Experiment 27: attacker capability and loss comparison
+
+See the [Experiment 27 instructions](../experiments/fhp/exp27_fhp_attacker_development/README.md).
+With the standard environment variables set, use a fresh `exp27-attack-smoke-*`
+ID and `bash gcp/run_exp27_attacker_development.sh run-smoke`. After reviewing
+success, use a fresh `exp27-attack-full-*` ID and
+`bash gcp/run_exp27_attacker_development.sh run`. One job runs learning controls,
+the seed-0 comparison and only scientifically qualified defender replications.
+One `n2-standard-8`, eight-hour cap. No automatic UCV policy repair; negative
+findings complete successfully. No `REPO_REF` or separate stage submissions needed.
+
 ## Experiment 26: attacker correctness and learning curves
 
 See the [Experiment 26 smoke/full instructions](../experiments/fhp/exp26_fhp_attacker_diagnostic/README.md).

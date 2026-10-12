@@ -52,6 +52,16 @@ After separate cloud smoke, `bash gcp/run_exp24_critic_stages.sh run` executes
 both studies and reports in one Batch job. No adaptive controller or policy
 quality claim is made; these are one-seed development studies.
 
+## Active Experiment 27: attacker capability and fitting objective
+
+[Experiment 27](experiments/fhp/exp27_fhp_attacker_development/README.md) tests
+weak-opponent learning controls and exact Leduc responses, then compares the
+original attacker loss with half-squared-error fitting against Exp10 seed 0.
+Independent qualification gates automatic replication on defender seeds 1 and 2.
+One `n2-standard-8`, eight-hour cap, no policy repair or Exp21 gate changes.
+Use `bash gcp/run_exp27_attacker_development.sh run-smoke`, then a fresh run ID
+with `run` after reviewing the smoke.
+
 ## Active Experiment 26: attacker learning diagnostic
 
 [Experiment 26](experiments/fhp/exp26_fhp_attacker_diagnostic/README.md) investigates
