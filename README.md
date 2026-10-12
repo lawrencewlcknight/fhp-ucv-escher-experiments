@@ -47,6 +47,17 @@ The shared evaluation suite owns the protocol (its Experiment 5, not UCV trainin
 Experiment 5). No model training occurs. The result is an exploitability
 lower-bound estimate, not exact exploitability or a Nash certificate.
 
+## Active Experiment 28: rare-state coverage and learning-path audit
+
+[Experiment 28](experiments/fhp/exp28_fhp_rare_state_audit/README.md) investigates
+unbeatable-hand folds using the Exp10 24h and Exp16 48h states. It audits retained
+replay and native regret estimates, passively observes short unchanged
+continuations, and compares matched policy-only refits on new board classes.
+After real cloud smoke, `bash gcp/run_exp28_rare_state_audit.sh run` runs the
+seed-0 pilot, seeds 1/2, gameplay guardrails and aggregation in one CPU Batch job.
+It does not start a new full training run or treat replay targets as an exact
+CFR average.
+
 ## Active Experiments 24 and 25: pre-fit critic budgets and objective generalisation
 
 [Experiment 24](experiments/fhp/exp24_fhp_critic_budget_stages/README.md) generates

@@ -29,6 +29,32 @@ safe trajectory boundary after 6 and 12 effective training hours, then stop.
 The 14-hour Batch limit leaves time for provisioning, installation, policy
 fitting, checkpoint serialization, diagnostics, and upload.
 
+## Experiment 28: rare-state coverage and learning-path audit
+
+See the [full protocol and output definitions](../experiments/fhp/exp28_fhp_rare_state_audit/README.md).
+From this repo root, after committing/pushing and with the usual environment
+variables set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp28-rare-smoke-$(date -u +%Y%m%d-%H%M%S)"
+export SMOKE_RUN_ID="$RUN_ID"
+bash gcp/run_exp28_rare_state_audit.sh smoke-cloud
+
+# Only once $SMOKE_RUN_ID-smoke succeeds; retain the same REPO_REF.
+export RUN_ID="exp28-rare-audit-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp28_rare_state_audit.sh run
+```
+
+One `n2-standard-16`, 250 GB disk, 24-hour safety cap, zero automatic retries.
+The single job audits Exp10/Exp16 states, checks the native estimator, traces
+short eight-worker continuations, fits matched policy-only controls, evaluates
+new board classes and plays duplicate-deal guardrails. Seed 0 precedes seeds 1/2;
+the gate checks integrity, not favourable findings. No fresh full solver-training
+campaign or separate stage submission is needed. Download
+`$BUCKET/$RUN_ID/analysis` as usual; candidate weights are separately under
+`$BUCKET/$RUN_ID/audit`. Resource/failure diagnostics are uploaded even on error.
+
 ## Experiments 24 and 25: pre-fit critic stage studies
 
 See the [complete protocol, smoke/full commands and downloads](../experiments/fhp/exp24_fhp_critic_budget_stages/README.md).
