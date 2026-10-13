@@ -1,0 +1,1109 @@
+{
+  "sources": [
+    {
+      "experiment": 10,
+      "seed": 0,
+      "run": "exp10-features-20261001-161740",
+      "worker": "task_000_hand_board_cached_parallel_ucv_escher_seed_0",
+      "policy": "checkpoints/hand_board_cached_parallel_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "2dabc42248cb33bfd351ad38eb9d97633acf2e030bf501b051e4d6469d3b01d9",
+      "state": "training_states/hand_board_cached_parallel_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "af7958ef84454b9be937835927fba49158cacfb353a97adcb6ccc4c5e08d184f",
+      "state_bytes": 5403461782,
+      "iteration": 673,
+      "nodes": 158546899
+    },
+    {
+      "experiment": 10,
+      "seed": 1,
+      "run": "exp10-features-20261001-161740",
+      "worker": "task_001_hand_board_cached_parallel_ucv_escher_seed_1",
+      "policy": "checkpoints/hand_board_cached_parallel_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "d7960186bedc4d2456a09dd82f7cf8b863a0a67486b896f77552b30fb63abfa0",
+      "state": "training_states/hand_board_cached_parallel_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "8e8f0197bba39c9aae68e790b258c81763a38973ea82cb97471feb58b104300b",
+      "state_bytes": 5402780054,
+      "iteration": 674,
+      "nodes": 158501615
+    },
+    {
+      "experiment": 10,
+      "seed": 2,
+      "run": "exp10-features-20261001-161740",
+      "worker": "task_002_hand_board_cached_parallel_ucv_escher_seed_2",
+      "policy": "checkpoints/hand_board_cached_parallel_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "99950075ebf28a0811c49775280bebc7ff3ab1a1b2c12e472006bf262c6b02fe",
+      "state": "training_states/hand_board_cached_parallel_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "31c575fcee39ed27b91d312c702c26c563f17fc42f3504381649108c4b490fff",
+      "state_bytes": 5404174230,
+      "iteration": 705,
+      "nodes": 164625233
+    },
+    {
+      "experiment": 29,
+      "seed": 0,
+      "run": "exp29-features-20261012-142946",
+      "worker": "task_000_strategic_a_ucv_escher_seed_0",
+      "policy": "checkpoints/strategic_a_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "083302736dd6f28d2e2b6d0c3e4898c39e5596da563d56d92583b773029eb90b",
+      "state": "training_states/strategic_a_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "2cf45ec37b5a0df980510bde6e5cbe3d05184bbea6b21bb93b8cdd170587d0f3",
+      "state_bytes": 5588982343,
+      "iteration": 621,
+      "nodes": 145350885
+    },
+    {
+      "experiment": 29,
+      "seed": 1,
+      "run": "exp29-features-20261012-142946",
+      "worker": "task_001_strategic_a_ucv_escher_seed_1",
+      "policy": "checkpoints/strategic_a_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "a23459fd27cba7490207ce4e7dc5c2460296b9654b97c27b27b8ab35aeede110",
+      "state": "training_states/strategic_a_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "9ee5e1aa32c3b97936a173545034aabcb557b4a493a550ec2ca49e0e700b5a40",
+      "state_bytes": 5592215495,
+      "iteration": 610,
+      "nodes": 143161657
+    },
+    {
+      "experiment": 29,
+      "seed": 2,
+      "run": "exp29-features-20261012-142946",
+      "worker": "task_002_strategic_a_ucv_escher_seed_2",
+      "policy": "checkpoints/strategic_a_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "a1669f9628280024fe19e2fb429807fd90afac47ccdf3cab9ad4a14394512b67",
+      "state": "training_states/strategic_a_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "4a1eb07fb0ed6084e32befd92aed517a7810b825be8e7a1384b771f01c9a5972",
+      "state_bytes": 5591042887,
+      "iteration": 547,
+      "nodes": 128460648
+    },
+    {
+      "experiment": 33,
+      "seed": 0,
+      "run": "exp33-features-20261012-143026",
+      "worker": "task_000_strategic_ae_ucv_escher_seed_0",
+      "policy": "checkpoints/strategic_ae_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "3aa07479ba475c5f6bebc5b7646d0bd97f31604cdd50e84b9ba1e8bb350a9ccf",
+      "state": "training_states/strategic_ae_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "77d737e3b57ad3915d71c3d0ad5dab03f2b5b3750edab75b02cb99c5347a0e54",
+      "state_bytes": 5957766856,
+      "iteration": 607,
+      "nodes": 142756713
+    },
+    {
+      "experiment": 33,
+      "seed": 1,
+      "run": "exp33-features-20261012-143026",
+      "worker": "task_001_strategic_ae_ucv_escher_seed_1",
+      "policy": "checkpoints/strategic_ae_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "2464da9890b5e706aa7b03564ebe512eb863efcaa0bd1ca88f6bdccd197b733e",
+      "state": "training_states/strategic_ae_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "404c4a34b50b54a9997d2486045e7fa03fb06eac8b534c2fcb8acb59a832eb78",
+      "state_bytes": 5959418120,
+      "iteration": 635,
+      "nodes": 149466003
+    },
+    {
+      "experiment": 33,
+      "seed": 2,
+      "run": "exp33-features-20261012-143026",
+      "worker": "task_002_strategic_ae_ucv_escher_seed_2",
+      "policy": "checkpoints/strategic_ae_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "298d4c5db9150823ebf99e1ce9f9bd29dd1b777a70b7b44e1a38b05f963d0d56",
+      "state": "training_states/strategic_ae_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "d89dc0ac3701dc4f6d606c606d53d92c2292444c05f22e3f6150c783b272ca2a",
+      "state_bytes": 5957664264,
+      "iteration": 624,
+      "nodes": 146093339
+    },
+    {
+      "experiment": 30,
+      "seed": 0,
+      "run": "exp30-features-20261012-142955",
+      "worker": "task_000_strategic_ab_ucv_escher_seed_0",
+      "policy": "checkpoints/strategic_ab_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "b42b8c7dceddec61850f2c6ba5380b7fdef518e9bee12034e66fe56d83e20605",
+      "state": "training_states/strategic_ab_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "4e1a117153ac388698d84cff2b5eef49bc0348dbd1af4d46a3b7af36b79c5b0d",
+      "state_bytes": 6487865544,
+      "iteration": 631,
+      "nodes": 147900915
+    },
+    {
+      "experiment": 30,
+      "seed": 1,
+      "run": "exp30-features-20261012-142955",
+      "worker": "task_001_strategic_ab_ucv_escher_seed_1",
+      "policy": "checkpoints/strategic_ab_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "18c9b299a277963c39cf96457049e86029687736b0279a1b0d291c3094293808",
+      "state": "training_states/strategic_ab_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "8ad99813c973ed419f73bd6047ce5f7c6ec71e36d346663dbfd83a13a31263fb",
+      "state_bytes": 6487521224,
+      "iteration": 491,
+      "nodes": 115219663
+    },
+    {
+      "experiment": 30,
+      "seed": 2,
+      "run": "exp30-features-20261012-142955",
+      "worker": "task_002_strategic_ab_ucv_escher_seed_2",
+      "policy": "checkpoints/strategic_ab_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "056ee23ce99c2aa2f7755810a9593efaa91fe2816eb54d9119c597be5c5d67a1",
+      "state": "training_states/strategic_ab_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "2c95204c5a806b4f0dc0c12b80d7b4557e78d7b02e3bd042faa038317f96f6d1",
+      "state_bytes": 6488637064,
+      "iteration": 607,
+      "nodes": 142565711
+    },
+    {
+      "experiment": 31,
+      "seed": 0,
+      "run": "exp31-features-20261012-143005",
+      "worker": "task_000_strategic_ac_ucv_escher_seed_0",
+      "policy": "checkpoints/strategic_ac_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "ca6f12257a5f09e9da80a310112ab5b3d0b25d7542c0833ad5b7ce37fc494198",
+      "state": "training_states/strategic_ac_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "99f9ace7ef6caa1adc6e7416d6f85645649d1ee54a8617c1340f750179b4b0ed",
+      "state_bytes": 6257565576,
+      "iteration": 635,
+      "nodes": 149110322
+    },
+    {
+      "experiment": 31,
+      "seed": 1,
+      "run": "exp31-features-20261012-143005",
+      "worker": "task_001_strategic_ac_ucv_escher_seed_1",
+      "policy": "checkpoints/strategic_ac_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "24766634beb691d7c37ff3c2e5d21eb69df281f805a479d01dac8fd8cc301207",
+      "state": "training_states/strategic_ac_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "086606a4be88050afc1aef9da638cc901bc8632d8a2773193354f963d8bdfa5a",
+      "state_bytes": 6258786248,
+      "iteration": 614,
+      "nodes": 144181640
+    },
+    {
+      "experiment": 31,
+      "seed": 2,
+      "run": "exp31-features-20261012-143005",
+      "worker": "task_002_strategic_ac_ucv_escher_seed_2",
+      "policy": "checkpoints/strategic_ac_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "af4a2b86194304b26a0949161701953d678ee5f55d02cfee133a203407c6000c",
+      "state": "training_states/strategic_ac_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "78067152495bb040e9268ade2609d34b8938bf242e1132e0688de4ac331f50a6",
+      "state_bytes": 6259009736,
+      "iteration": 574,
+      "nodes": 134624982
+    },
+    {
+      "experiment": 32,
+      "seed": 0,
+      "run": "exp32-features-20261012-143017",
+      "worker": "task_000_strategic_d_ucv_escher_seed_0",
+      "policy": "checkpoints/strategic_d_ucv_escher_seed_0_time_24h.pkl",
+      "policy_sha256": "0e2d129011357d3af981206aeedd45053fac29e8130bc55ba7eeb304f4d2135c",
+      "state": "training_states/strategic_d_ucv_escher_seed_0_time_24h.pt",
+      "state_sha256": "82e816fc878cca69c9cc924fa35134bebfc605e58c7f9762f22a01a6f8a17479",
+      "state_bytes": 5815083655,
+      "iteration": 672,
+      "nodes": 158240787
+    },
+    {
+      "experiment": 32,
+      "seed": 1,
+      "run": "exp32-features-20261012-143017",
+      "worker": "task_001_strategic_d_ucv_escher_seed_1",
+      "policy": "checkpoints/strategic_d_ucv_escher_seed_1_time_24h.pkl",
+      "policy_sha256": "c8a33794afef64bfc9fe3b609b6b7c2ed34b23114f9c50b932a7d63fecca1bf0",
+      "state": "training_states/strategic_d_ucv_escher_seed_1_time_24h.pt",
+      "state_sha256": "e8209f4b5af31acbaecd42b935c4c223ff449a8ecf8afd9454f3eea2d5af53ab",
+      "state_bytes": 5814878407,
+      "iteration": 675,
+      "nodes": 158044032
+    },
+    {
+      "experiment": 32,
+      "seed": 2,
+      "run": "exp32-features-20261012-143017",
+      "worker": "task_002_strategic_d_ucv_escher_seed_2",
+      "policy": "checkpoints/strategic_d_ucv_escher_seed_2_time_24h.pkl",
+      "policy_sha256": "ffb5a5d985ba1d68a3afea8162bd15c101648a00186858c2ca1ec03ed67b857c",
+      "state": "training_states/strategic_d_ucv_escher_seed_2_time_24h.pt",
+      "state_sha256": "fca11aff75c9f32060ed0f9d6d065ef409108b1f18cb6ccacefa01856c2dd484",
+      "state_bytes": 5814875911,
+      "iteration": 722,
+      "nodes": 169545114
+    }
+  ],
+  "prior_board_classes": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      5,
+      25
+    ],
+    [
+      0,
+      5,
+      37
+    ],
+    [
+      0,
+      5,
+      44
+    ],
+    [
+      0,
+      5,
+      48
+    ],
+    [
+      0,
+      8,
+      16
+    ],
+    [
+      0,
+      8,
+      21
+    ],
+    [
+      0,
+      8,
+      28
+    ],
+    [
+      0,
+      8,
+      29
+    ],
+    [
+      0,
+      8,
+      41
+    ],
+    [
+      0,
+      9,
+      38
+    ],
+    [
+      0,
+      12,
+      25
+    ],
+    [
+      0,
+      12,
+      36
+    ],
+    [
+      0,
+      13,
+      29
+    ],
+    [
+      0,
+      13,
+      46
+    ],
+    [
+      0,
+      17,
+      20
+    ],
+    [
+      0,
+      17,
+      29
+    ],
+    [
+      0,
+      17,
+      38
+    ],
+    [
+      0,
+      17,
+      40
+    ],
+    [
+      0,
+      21,
+      26
+    ],
+    [
+      0,
+      21,
+      44
+    ],
+    [
+      0,
+      21,
+      50
+    ],
+    [
+      0,
+      24,
+      32
+    ],
+    [
+      0,
+      25,
+      45
+    ],
+    [
+      0,
+      25,
+      46
+    ],
+    [
+      0,
+      32,
+      40
+    ],
+    [
+      0,
+      32,
+      44
+    ],
+    [
+      0,
+      33,
+      38
+    ],
+    [
+      0,
+      33,
+      41
+    ],
+    [
+      0,
+      36,
+      40
+    ],
+    [
+      4,
+      5,
+      6
+    ],
+    [
+      4,
+      5,
+      36
+    ],
+    [
+      4,
+      8,
+      48
+    ],
+    [
+      4,
+      9,
+      26
+    ],
+    [
+      4,
+      9,
+      42
+    ],
+    [
+      4,
+      12,
+      13
+    ],
+    [
+      4,
+      16,
+      20
+    ],
+    [
+      4,
+      16,
+      28
+    ],
+    [
+      4,
+      17,
+      30
+    ],
+    [
+      4,
+      20,
+      37
+    ],
+    [
+      4,
+      20,
+      48
+    ],
+    [
+      4,
+      21,
+      30
+    ],
+    [
+      4,
+      21,
+      33
+    ],
+    [
+      4,
+      24,
+      32
+    ],
+    [
+      4,
+      24,
+      45
+    ],
+    [
+      4,
+      25,
+      37
+    ],
+    [
+      4,
+      25,
+      38
+    ],
+    [
+      4,
+      29,
+      42
+    ],
+    [
+      4,
+      33,
+      34
+    ],
+    [
+      4,
+      37,
+      40
+    ],
+    [
+      4,
+      37,
+      45
+    ],
+    [
+      4,
+      37,
+      50
+    ],
+    [
+      4,
+      44,
+      49
+    ],
+    [
+      4,
+      45,
+      46
+    ],
+    [
+      4,
+      45,
+      50
+    ],
+    [
+      4,
+      49,
+      50
+    ],
+    [
+      8,
+      9,
+      10
+    ],
+    [
+      8,
+      9,
+      16
+    ],
+    [
+      8,
+      9,
+      30
+    ],
+    [
+      8,
+      9,
+      36
+    ],
+    [
+      8,
+      9,
+      46
+    ],
+    [
+      8,
+      12,
+      20
+    ],
+    [
+      8,
+      12,
+      24
+    ],
+    [
+      8,
+      12,
+      41
+    ],
+    [
+      8,
+      13,
+      38
+    ],
+    [
+      8,
+      16,
+      20
+    ],
+    [
+      8,
+      17,
+      18
+    ],
+    [
+      8,
+      17,
+      29
+    ],
+    [
+      8,
+      17,
+      49
+    ],
+    [
+      8,
+      20,
+      24
+    ],
+    [
+      8,
+      20,
+      49
+    ],
+    [
+      8,
+      21,
+      37
+    ],
+    [
+      8,
+      21,
+      44
+    ],
+    [
+      8,
+      21,
+      50
+    ],
+    [
+      8,
+      24,
+      25
+    ],
+    [
+      8,
+      24,
+      36
+    ],
+    [
+      8,
+      24,
+      44
+    ],
+    [
+      8,
+      24,
+      49
+    ],
+    [
+      8,
+      29,
+      48
+    ],
+    [
+      8,
+      33,
+      38
+    ],
+    [
+      8,
+      33,
+      40
+    ],
+    [
+      8,
+      33,
+      44
+    ],
+    [
+      8,
+      33,
+      46
+    ],
+    [
+      8,
+      36,
+      48
+    ],
+    [
+      8,
+      37,
+      46
+    ],
+    [
+      8,
+      41,
+      42
+    ],
+    [
+      12,
+      13,
+      14
+    ],
+    [
+      12,
+      13,
+      22
+    ],
+    [
+      12,
+      13,
+      32
+    ],
+    [
+      12,
+      17,
+      40
+    ],
+    [
+      12,
+      17,
+      44
+    ],
+    [
+      12,
+      17,
+      49
+    ],
+    [
+      12,
+      17,
+      50
+    ],
+    [
+      12,
+      20,
+      24
+    ],
+    [
+      12,
+      20,
+      29
+    ],
+    [
+      12,
+      21,
+      29
+    ],
+    [
+      12,
+      21,
+      33
+    ],
+    [
+      12,
+      21,
+      40
+    ],
+    [
+      12,
+      21,
+      45
+    ],
+    [
+      12,
+      25,
+      37
+    ],
+    [
+      12,
+      25,
+      38
+    ],
+    [
+      12,
+      29,
+      42
+    ],
+    [
+      12,
+      29,
+      46
+    ],
+    [
+      12,
+      32,
+      36
+    ],
+    [
+      12,
+      33,
+      38
+    ],
+    [
+      12,
+      36,
+      41
+    ],
+    [
+      12,
+      36,
+      44
+    ],
+    [
+      12,
+      37,
+      49
+    ],
+    [
+      12,
+      40,
+      44
+    ],
+    [
+      16,
+      17,
+      18
+    ],
+    [
+      16,
+      17,
+      24
+    ],
+    [
+      16,
+      20,
+      45
+    ],
+    [
+      16,
+      21,
+      36
+    ],
+    [
+      16,
+      21,
+      38
+    ],
+    [
+      16,
+      21,
+      50
+    ],
+    [
+      16,
+      24,
+      48
+    ],
+    [
+      16,
+      25,
+      50
+    ],
+    [
+      16,
+      29,
+      33
+    ],
+    [
+      16,
+      29,
+      50
+    ],
+    [
+      16,
+      33,
+      46
+    ],
+    [
+      16,
+      33,
+      48
+    ],
+    [
+      16,
+      33,
+      50
+    ],
+    [
+      16,
+      37,
+      48
+    ],
+    [
+      16,
+      40,
+      48
+    ],
+    [
+      16,
+      41,
+      49
+    ],
+    [
+      16,
+      44,
+      49
+    ],
+    [
+      20,
+      21,
+      22
+    ],
+    [
+      20,
+      21,
+      24
+    ],
+    [
+      20,
+      21,
+      30
+    ],
+    [
+      20,
+      21,
+      34
+    ],
+    [
+      20,
+      24,
+      25
+    ],
+    [
+      20,
+      25,
+      42
+    ],
+    [
+      20,
+      28,
+      29
+    ],
+    [
+      20,
+      28,
+      37
+    ],
+    [
+      20,
+      29,
+      40
+    ],
+    [
+      20,
+      33,
+      38
+    ],
+    [
+      20,
+      36,
+      41
+    ],
+    [
+      20,
+      40,
+      44
+    ],
+    [
+      20,
+      44,
+      45
+    ],
+    [
+      24,
+      25,
+      26
+    ],
+    [
+      24,
+      25,
+      32
+    ],
+    [
+      24,
+      25,
+      46
+    ],
+    [
+      24,
+      28,
+      44
+    ],
+    [
+      24,
+      29,
+      30
+    ],
+    [
+      24,
+      29,
+      34
+    ],
+    [
+      24,
+      29,
+      48
+    ],
+    [
+      24,
+      29,
+      50
+    ],
+    [
+      24,
+      32,
+      36
+    ],
+    [
+      24,
+      32,
+      40
+    ],
+    [
+      24,
+      37,
+      46
+    ],
+    [
+      28,
+      29,
+      30
+    ],
+    [
+      28,
+      29,
+      50
+    ],
+    [
+      28,
+      32,
+      36
+    ],
+    [
+      28,
+      33,
+      40
+    ],
+    [
+      28,
+      33,
+      41
+    ],
+    [
+      28,
+      36,
+      40
+    ],
+    [
+      28,
+      40,
+      48
+    ],
+    [
+      28,
+      41,
+      42
+    ],
+    [
+      32,
+      33,
+      34
+    ],
+    [
+      32,
+      33,
+      38
+    ],
+    [
+      32,
+      33,
+      50
+    ],
+    [
+      32,
+      37,
+      45
+    ],
+    [
+      32,
+      37,
+      50
+    ],
+    [
+      32,
+      41,
+      46
+    ],
+    [
+      32,
+      44,
+      48
+    ],
+    [
+      36,
+      37,
+      38
+    ],
+    [
+      36,
+      37,
+      40
+    ],
+    [
+      36,
+      41,
+      50
+    ],
+    [
+      40,
+      41,
+      42
+    ],
+    [
+      40,
+      44,
+      45
+    ],
+    [
+      40,
+      44,
+      48
+    ],
+    [
+      44,
+      45,
+      46
+    ],
+    [
+      48,
+      49,
+      50
+    ]
+  ],
+  "provenance": {
+    "cloud_outputs/exp28-rare-audit-20261012-201915/analysis/prior_library.json": "fcbf4cd00ff2cfb24552c9dc423b4bb4673069b34d7a90ee9f01dfd227b3da5d",
+    "cloud_outputs/exp28-rare-audit-20261012-201915/analysis/panel.json": "a6b1a8cf9504c6ecc1dd3db27637d794d10ec97b74f91a8593cea459bfb68dcd"
+  }
+}

@@ -1303,6 +1303,14 @@ outputs. See the protocol for standalone cloud smoke, status, resume and downloa
 Seven charts and seed-level uncertainty help assess a late-training plateau;
 non-significant differences are not treated as proof of convergence.
 
+## Experiment 35: rare-decision audit of strategic feature models
+
+The [Experiment 35 protocol](experiments/fhp/exp35_fhp_feature_rare_audit/README.md)
+compares all three 24h seeds of Experiments 10 and 29–33 on known and fresh
+terminal decision situations, measuring deployed and current regret policies.
+It runs on one CPU VM without retraining. See the protocol for cloud smoke,
+one-command full submission, recovery, expected runtime and downloads.
+
 ## Verification
 
 ```bash

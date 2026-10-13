@@ -1236,6 +1236,30 @@ Keep at least the run manifest, both checkpoint manifests and policy files,
 summary, Batch status, detailed diagnostics, resource snapshots, and run log.
 Do not delete a failed job's evidence until its cause is understood.
 
+## Experiment 35 — rare-decision audit of Experiments 10 and 29–33
+
+See the [complete protocol and run instructions](../experiments/fhp/exp35_fhp_feature_rare_audit/README.md).
+One `n2-standard-16` audits all 18 existing 24h models; no training. After committing
+and pushing, with `PROJECT_ID`, `REGION`, `BUCKET` and `SA_EMAIL` set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp35-rare-smoke-$(date -u +%Y%m%d-%H%M%S)"
+export SMOKE_RUN_ID="$RUN_ID"
+bash gcp/run_exp35_feature_rare_audit.sh smoke-cloud
+```
+
+After smoke succeeds (retain `SMOKE_RUN_ID`):
+
+```bash
+export RUN_ID="exp35-rare-full-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp35_feature_rare_audit.sh run
+```
+
+Allow 45–120 minutes for full, possibly three hours with slow I/O; 12-hour cap.
+All six encoders are smoke-tested using seed 0. Results are persisted after each
+model; `RESUME_RUN_ID` can recover a same-revision interrupted full audit.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools
