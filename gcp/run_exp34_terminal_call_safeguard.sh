@@ -10,7 +10,7 @@ case "$ACTION" in
     echo 'Default EXP34_MODE=smoke: small end-to-end evaluation, no training.'
     echo 'EXP34_MODE=full: all 3 frozen Exp16 48h seeds, paired games and full evaluation suite.'
     echo 'Set PROJECT_ID REGION BUCKET SA_EMAIL RUN_ID (fresh exp34-safeguard-*).'
-    echo 'One n2-standard-16 VM, 48h hard cap in full mode; timing gate before large gameplay.'
+    echo 'One n2-standard-16 VM, 48h hard cap in full mode; advisory timing from retained evaluation batches.'
     echo 'Both repos are source-bundled by hash. REPO_REF is deliberately unused.'
     echo 'run prepares and submits; recover uses the original immutable bundle and RECOVERY_TAG.'
     exit 0 ;;

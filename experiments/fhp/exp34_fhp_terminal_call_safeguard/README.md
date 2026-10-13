@@ -16,5 +16,14 @@ Implementation/protocol: `../../fhp-evaluation-suite/docs/exp34_terminal_call_sa
 relative to the UCV repository root. Launch with
 `bash gcp/run_exp34_terminal_call_safeguard.sh run`; `EXP34_MODE=smoke` is default,
 and `EXP34_MODE=full` explicitly selects the large study. One n2-standard-16 VM;
-full-mode 48h hard cap and a pre-gameplay timing gate. Nothing is launched by
-creating or testing this experiment. No new training-state artifacts.
+full-mode 48h hard cap and an advisory runtime forecast from the first two real
+evaluation shards per matchup. These shards count toward the final sample and
+are not repeated. A padded estimate above the 30h planning target warns rather
+than aborting; the strategic audit can use the remaining job time. Correctness,
+source-integrity and actual resource limits remain enforced. Nothing is launched
+by creating or testing this experiment. No new training-state artifacts.
+
+The failed `exp34-safeguard-full-20261012-205730` attempt completed validation and
+profiling only; its old source bundle retains the rigid forecast gate. To use the
+fix, prepare a fresh run ID rather than recovering/submitting that old bundle.
+Its saved diagnostic artifacts and all source models remain intact.
