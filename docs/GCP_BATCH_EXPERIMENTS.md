@@ -1260,6 +1260,39 @@ Allow 45–120 minutes for full, possibly three hours with slow I/O; 12-hour cap
 All six encoders are smoke-tested using seed 0. Results are persisted after each
 model; `RESUME_RUN_ID` can recover a same-revision interrupted full audit.
 
+## Experiment 36 — richer inputs and 2,500 critic updates
+
+See the [complete protocol](../experiments/fhp/exp36_fhp_strength_critic2500/README.md).
+Three `n2-standard-16` CPU VMs train fresh seeds for 24 active hours; six-hour
+policies and complete 24h restart states are retained. No automatic evaluation.
+After committing/pushing, from the repository root with the usual GCP variables:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export EXP36_TRAIN_REF="$REPO_REF"
+export RUN_ID="exp36-rich2500-$(date -u +%Y%m%d-%H%M%S)"
+export EXP36_RUN24_ID="$RUN_ID"
+export EXP36_TOTAL_HOURS=24
+unset EXP36_SOURCE_RUN_ID
+bash gcp/run_exp36_strength_critic2500.sh smoke-cloud
+```
+
+After smoke succeeds, retain the same `RUN_ID` and submit the full controller:
+
+```bash
+bash gcp/run_exp36_strength_critic2500.sh run
+```
+
+After training and aggregation succeed, optionally launch the separate evaluator:
+
+```bash
+bash gcp/run_exp36_strength_critic2500.sh evaluate
+```
+
+The controller runs independently of your laptop. The protocol documents
+same-revision evaluation recovery and an explicit, separate 24→48h continuation;
+neither continuation nor evaluation is triggered automatically by training.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools

@@ -1311,6 +1311,17 @@ terminal decision situations, measuring deployed and current regret policies.
 It runs on one CPU VM without retraining. See the protocol for cloud smoke,
 one-command full submission, recovery, expected runtime and downloads.
 
+## Experiment 36: richer inputs and 2,500 critic updates
+
+The [Experiment 36 protocol](experiments/fhp/exp36_fhp_strength_critic2500/README.md)
+combines Experiment 33's relative-strength/betting features with 2,500 updates
+per critic. Three fresh seeds train for 24 active hours, retaining six-hour
+policies and complete final states for optional continuation to 48h. Training
+and evaluation are separate: the evaluator compares against Experiments 20
+(primary), 33 and 10, including rule agents, LBR and rare-decision diagnostics.
+The protocol includes cloud smoke, one-command training, evaluation, recovery
+and continuation instructions. No jobs are launched merely by generating specs.
+
 ## Verification
 
 ```bash

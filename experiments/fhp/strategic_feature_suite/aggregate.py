@@ -60,6 +60,9 @@ def aggregate_workers(
             raise ValueError(f"Not an strategic-feature experiment worker: {folder}")
         if summary["execution_diagnostics"]["parallel_num_workers"] != 8:
             raise ValueError("strategic-feature experiment requires eight traversal actors")
+        if getattr(experiment, "REQUIRE_CRITIC_BUDGET_DIAGNOSTICS", False):
+            if summary["execution_diagnostics"].get("critic_train_steps_per_fit") != [expected_config["baseline_network_train_steps"]] * 2:
+                raise ValueError("Actual critic update budgets differ from the experiment contract")
         if not (summary["execution_diagnostics"]["parallel_frozen_critic_target_cache"]
                 and summary["execution_diagnostics"]["cumulative_cached_critic_fit_calls"] > 0):
             raise ValueError("No verified cached critic fitting in this worker")

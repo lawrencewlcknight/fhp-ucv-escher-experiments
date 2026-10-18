@@ -136,7 +136,7 @@ def run_worker(
             training_state_reader=read_training_state,
             training_state_restorer=partial(restore_training_state, experiment=experiment),
             training_state_saver=save_training_state,
-            remote_task_env="FEATURE_REMOTE_TASK_URI",
+            remote_task_env=getattr(experiment, "REMOTE_TASK_ENV", "FEATURE_REMOTE_TASK_URI"),
             experiment_label="strategic-feature experiment",
             training_state_retention="final",
             initial_resume_state=initial_resume_state,
