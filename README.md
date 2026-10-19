@@ -1,5 +1,14 @@
 # FHP UCV-ESCHER Experiments
 
+## Experiment 37: 24-hour critic-configuration comparison
+
+[Experiment 37](experiments/fhp/exp37_fhp_critic_budget_evaluation/README.md)
+compares the frozen Experiment 10, 20 and 36 policies: all cross-seed head-to-head
+pairings, the established rule-agent/LBR suite, rare-state diagnostics and
+training-cost context. One resumable CPU Batch job runs smoke then full analysis.
+It does not retrain models or treat Experiment 36's richer features as a pure
+critic-budget change.
+
 ## Experiments 29–33: additive strategic features
 
 Five separate 24-active-hour, three-seed experiments add relative strength,

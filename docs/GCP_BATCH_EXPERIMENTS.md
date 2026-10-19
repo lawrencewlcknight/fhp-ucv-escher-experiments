@@ -1293,6 +1293,32 @@ The controller runs independently of your laptop. The protocol documents
 same-revision evaluation recovery and an explicit, separate 24→48h continuation;
 neither continuation nor evaluation is triggered automatically by training.
 
+## Experiment 37 — compare 24h policies with 10,000 / 5,000 / 2,500 critic updates
+
+The [complete protocol and recovery guide](../experiments/fhp/exp37_fhp_critic_budget_evaluation/README.md)
+compares Experiments 10, 20 and 36, three seeds each, on one `n2-standard-16` CPU
+VM. All 27 cross-seed matchups, common rule opponents, LBR and rare-state checks
+run in one job, with incremental saved shards. Experiment 36 also changes input
+features; this is not a pure three-level critic-budget ablation.
+
+After committing and pushing, from the repository root with `PROJECT_ID`,
+`REGION`, `BUCKET` and `SA_EMAIL` set:
+
+```bash
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp37-critic-compare-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp37_critic_budget_evaluation.sh run
+```
+
+This runs a tiny integration smoke followed by full evaluation and reporting;
+the laptop can disconnect. For smoke only, use `smoke-cloud` instead of `run`.
+To recover interrupted work use `resume` with the same `RUN_ID`, `REPO_REF` and
+source IDs. It gives the retry a new Batch name while preserving the original
+output prefix. Do not change the protocol when resuming.
+
+Expected 3–5 hours, allow 6–8 plus queueing; the default 48-hour safety ceiling
+does not impose an early timing gate. Results are in `$BUCKET/$RUN_ID/analysis/`.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools

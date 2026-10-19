@@ -43,7 +43,7 @@ def assess(record, panel):
         seconds=perf_counter() - started)
 
 
-def run(output, records, fingerprint, *, smoke):
+def run(output, records, fingerprint, *, smoke, controls=("exp20", "exp33", "exp10")):
     panel_path = output / "rare_panel.json"
     receipt_path = output / "rare_panel_receipt.json"
     if receipt_path.exists():
@@ -81,13 +81,14 @@ def run(output, records, fingerprint, *, smoke):
     protocol._write_csv(output / "rare_by_seed.csv", rows)
     index = {(r["experiment"], r["training_seed"], r["group"]): r for r in rows}
     differences = []
-    for control in ("exp20", "exp33", "exp10"):
+    for control in controls:
         for group in sorted({r["group"] for r in rows}):
             for metric in ("mean_fold_probability", "mean_gap_bb", "p95_gap_bb", "max_gap_bb", "fraction_fold_over_half"):
                 values = [r[metric] - index[(control, r["training_seed"], group)][metric]
                           for r in rows if r["experiment"] == "exp36" and r["group"] == group]
                 differences.append(dict(comparator=control, group=group, metric=metric, **interval(values)))
     summary = dict(panel_sha256=panel_sha, policy_count=len(results),
+        by_seed=rows,
         paired_seed_differences=differences, lower_is_better=True,
         scope=panel["scope"], panel_construction_seconds=panel["construction_seconds"],
         inference_seconds=sum(r["seconds"] for r in results),
