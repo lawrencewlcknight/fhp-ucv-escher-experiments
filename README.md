@@ -1,5 +1,14 @@
 # FHP UCV-ESCHER Experiments
 
+## Experiment 38: continue Experiment 36 from 24 to 48 hours
+
+[Experiment 38](experiments/fhp/exp38_fhp_strength_critic2500_48h/README.md)
+continues all three original Experiment 36 seeds, preserving its richer inputs,
+2,500 critic updates, eight Ray workers and original learner revision. New
+playable policies are saved at 30/36/42/48 cumulative active hours, with one
+complete, restartable 48h training state per seed. One cloud controller runs
+smoke, training and reporting; evaluation and any further training are separate.
+
 ## Experiment 37: 24-hour critic-configuration comparison
 
 [Experiment 37](experiments/fhp/exp37_fhp_critic_budget_evaluation/README.md)

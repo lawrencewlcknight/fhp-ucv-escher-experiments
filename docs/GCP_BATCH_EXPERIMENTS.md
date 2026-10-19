@@ -1319,6 +1319,45 @@ output prefix. Do not change the protocol when resuming.
 Expected 3–5 hours, allow 6–8 plus queueing; the default 48-hour safety ceiling
 does not impose an early timing gate. Results are in `$BUCKET/$RUN_ID/analysis/`.
 
+## Experiment 38 — continue Experiment 36 to 48 cumulative hours
+
+See the [full continuation protocol and recovery guide](../experiments/fhp/exp38_fhp_strength_critic2500_48h/README.md).
+The original three seeds resume from `exp36-rich2500-20261018-205125`, with
+unchanged richer features, 2,500 critic updates and eight Ray workers. Each uses
+an `n2-standard-16` CPU VM. Policies are added at 30/36/42/48h and a complete
+restart state is saved at 48h. There is no automatic evaluation.
+
+After committing and pushing, from the repository root:
+
+```bash
+export PROJECT_ID="clever-overview-399515"
+export REGION="europe-west1"
+export BUCKET="gs://clever-overview-399515-fhp-escher-results"
+export SA_EMAIL="fhp-escher-runner@clever-overview-399515.iam.gserviceaccount.com"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp38-rich48-$(date -u +%Y%m%d-%H%M%S)"
+export EXP38_PARALLELISM=3
+bash gcp/run_exp38_strength_critic2500_48h.sh smoke-cloud
+```
+
+After smoke succeeds, retain the same `RUN_ID` and submit the controller:
+
+```bash
+bash gcp/run_exp38_strength_critic2500_48h.sh run
+```
+
+It reuses smoke, trains all seeds and reports completion without requiring the
+laptop to stay connected. `run` can also run smoke automatically if not already
+submitted. Allow approximately 24 additional active training hours plus setup,
+policy fitting, saving, transfers and queueing. `REPO_REF` pins the new workflow;
+learning stays pinned to the original Experiment 36 revision and runtime.
+
+The original states are never overwritten. Final files are listed in
+`analysis/restart_inventory.json`; only the final 48h checkpoint is a full
+training state, whereas 30/36/42h exports are playable policies. If aggregation
+alone fails, use `aggregate` with the same run ID to retry reporting without
+retraining. Full training does not automatically retry after a failure.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools
