@@ -1358,6 +1358,44 @@ training state, whereas 30/36/42h exports are playable policies. If aggregation
 alone fails, use `aggregate` with the same run ID to retry reporting without
 retraining. Full training does not automatically retry after a failure.
 
+## Experiment 39 — compare 48-hour configurations and 24-to-48-hour improvement
+
+See the [full protocol and recovery guide](../experiments/fhp/exp39_fhp_48h_evaluation/README.md).
+This evaluation compares Experiment 38 with Experiment 16 at 48 hours and with
+its own Experiment 36 predecessor at 24 hours. It uses all nine cross-seed
+pairings for each comparison, the rule-agent/LBR suite and the frozen rare-state
+panel. It preserves the pairing between the continued training trajectories.
+No retraining occurs, and it does not claim to calculate exact exploitability.
+
+Commit and push the implementation first. From this repository root:
+
+```bash
+export PROJECT_ID="clever-overview-399515"
+export REGION="europe-west1"
+export BUCKET="gs://clever-overview-399515-fhp-escher-results"
+export SA_EMAIL="fhp-escher-runner@clever-overview-399515.iam.gserviceaccount.com"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp39-48h-compare-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp39_48h_evaluation.sh run
+```
+
+One `n2-standard-16` job performs a smoke test then full analysis, with per-shard
+recovery and periodic uploads. An optional standalone smoke uses a fresh
+`RUN_ID` and `smoke-cloud`. For an interrupted run, keep the original `RUN_ID`
+and `REPO_REF`, then use `resume`; no automatic retry is charged. Use `status`
+to inspect jobs. The default wall-time ceiling is 48 hours, not a target duration.
+
+After successful completion:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "$BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+Keep the task cache in GCS if later recovery may be needed. Primary reports are
+`analysis_summary.md`, `summary.json` and the head-to-head interval plots.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools

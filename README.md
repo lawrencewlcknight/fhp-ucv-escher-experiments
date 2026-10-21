@@ -1,5 +1,14 @@
 # FHP UCV-ESCHER Experiments
 
+## Experiment 39: 48-hour performance and continuation comparison
+
+[Experiment 39](experiments/fhp/exp39_fhp_48h_evaluation/README.md)
+evaluates Experiment 38 against the older 48-hour Experiment 16 model and its
+own 24-hour Experiment 36 predecessor. It includes all cross-seed head-to-head
+matches, paired trajectory analysis, the established rule-agent/LBR suite and
+the frozen rare-state diagnostic panel. One resumable CPU Batch job runs smoke
+then full evaluation; no models are retrained.
+
 ## Experiment 38: continue Experiment 36 from 24 to 48 hours
 
 [Experiment 38](experiments/fhp/exp38_fhp_strength_critic2500_48h/README.md)
