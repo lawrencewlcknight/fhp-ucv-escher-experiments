@@ -1396,6 +1396,52 @@ gcloud storage rsync --recursive --exclude='.*task_results/.*' \
 Keep the task cache in GCS if later recovery may be needed. Primary reports are
 `analysis_summary.md`, `summary.json` and the head-to-head interval plots.
 
+## Experiment 40 — selected 48-hour UCV / VR-Deep / SD-CFR models
+
+See the [protocol, statistics and recovery guide](../experiments/fhp/exp40_fhp_threeway_48h/README.md).
+This evaluates UCV Experiment 38, VR Experiment 6 and SD Experiment 6 with all
+three seeds each. It includes 27 direct matchup cells and 45 rule-agent cells,
+totalling 6.3 million production hands. No LBR, strategic audit or retraining.
+
+After committing and pushing Experiment 40, run from the UCV repository root:
+
+```bash
+export PROJECT_ID="clever-overview-399515"
+export REGION="europe-west1"
+export BUCKET="gs://clever-overview-399515-fhp-escher-results"
+export SA_EMAIL="fhp-escher-runner@clever-overview-399515.iam.gserviceaccount.com"
+export REPO_REF="$(git rev-parse HEAD)"
+export RUN_ID="exp40-threeway48-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp40_threeway_48h.sh run
+```
+
+One `n2-standard-16` job performs validation, smoke, informational profiling and
+full analysis automatically, with a 24-hour overall ceiling. The runner service
+account needs read access to the UCV, VR and SD source buckets. No IAM changes
+or automatic paid retries are made. Forecasts do not block scoring.
+
+For an optional **separate** cloud smoke, use a fresh run ID:
+
+```bash
+export RUN_ID="exp40-threeway-smoke-$(date -u +%Y%m%d-%H%M%S)"
+bash gcp/run_exp40_threeway_48h.sh smoke-cloud
+```
+
+For recovery, keep the original full-run ID, commit and source buckets, then run
+`bash gcp/run_exp40_threeway_48h.sh resume`. Completed shards are reused.
+Use `status` to inspect jobs and `dry-run` to generate a job without submitting it.
+
+After completion, confirm `analysis/SUCCESS.json` has `smoke=false`, then download:
+
+```bash
+mkdir -p "cloud_outputs/$RUN_ID/analysis"
+gcloud storage rsync --recursive --exclude='.*task_results/.*' \
+  "$BUCKET/$RUN_ID/analysis" "cloud_outputs/$RUN_ID/analysis"
+```
+
+The primary outputs are `analysis_summary.md`, `summary.json`, three cross-seed
+matrices and rule-agent tables. Keep the GCS task cache for recovery.
+
 ## 16. Dependency installation
 
 Each Batch VM starts clean. The checked-in helper installs system build tools

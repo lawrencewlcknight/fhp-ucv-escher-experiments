@@ -1,5 +1,14 @@
 # FHP UCV-ESCHER Experiments
 
+## Experiment 40: selected 48-hour models across algorithms
+
+[Experiment 40](experiments/fhp/exp40_fhp_threeway_48h/README.md) compares
+UCV-Escher Experiment 38, VR-DeepPDCFR+ Experiment 6 and SD-CFR Experiment 6,
+using all three seeds per algorithm and SD's complete historical mixture.
+One resumable CPU Batch job runs smoke then 6.3 million hands of head-to-head
+and rule-agent evaluation. It excludes LBR and strategic-position audits;
+no models are retrained. Start it from this repository's root.
+
 ## Experiment 39: 48-hour performance and continuation comparison
 
 [Experiment 39](experiments/fhp/exp39_fhp_48h_evaluation/README.md)
