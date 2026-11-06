@@ -1,0 +1,47 @@
+{
+  "sd": {
+    "config_sha256": "9b06407a3a010ca7b6450783843dd293f6092c087f17d1d0df2d861b9a2e73bd",
+    "metadata": {
+      "0": {
+        "SUCCESS.json": "3d0ca2152d9f9381c0f18fecfb6f435c965f07d46ea562ac247d1c169395b24b",
+        "checkpoint_manifest.json": "0eded9994c19b741e379671c61bf16c340174fa680e0d55f44d7dcdc1c453bb7",
+        "run_manifest.json": "f039f7225fed495c7c691be3838f7cb13d2bf18ad3fb8153f3e7a837ce41442c"
+      },
+      "1": {
+        "SUCCESS.json": "2ed51ce0d0169945b34beff8c594a62ae1a738109f6b71fd0824ad35b28369f1",
+        "checkpoint_manifest.json": "1641936eb1d9bb921f04e57f5fb2a1b6e453d624884db53acafad280009fa215",
+        "run_manifest.json": "b1131c944dd80f34fc570fe48e83fbacd25cf3321b81c05075e903cbe2c6de28"
+      },
+      "2": {
+        "SUCCESS.json": "1ac0620e00be7ec4253752c9546b2183010cdc4657d0e8a5111864d54e800a72",
+        "checkpoint_manifest.json": "29efdbe975512abf6ef974f7002ab161a2bfd990c8ff2497ead2cce884067e75",
+        "run_manifest.json": "d231ed35298e36d4843869feab4b489374ec6f3d6e4b211d7446478bd331fbf2"
+      }
+    },
+    "run_id": "sd8-rich48-20261101-234234"
+  },
+  "vr": {
+    "config_sha256": "1938752e0c82490f030fcef7996183148544b7c07107f47287587b718bbc65aa",
+    "metadata": {
+      "0": {
+        "SUCCESS.json": "4b31c41ad26def8d4948c403eb2d65b587cc38d8cc1812fae103e97de801c93b",
+        "checkpoint_manifest.json": "a6c19757b369cf902714304ddae54fff9c591257ba3dd715bdd3a8dbff602e15",
+        "run_manifest.json": "0c0491d5d3e50a4f3548542245a0a8422bf659a4159c7cc086f30a368cbdbe7a",
+        "summary.json": "15f49d3da553394386b91982bfa547da7a52f8b33242e40f12412c99ead11e11"
+      },
+      "1": {
+        "SUCCESS.json": "25bdf30118b719b64a10a0cde93b2a2b1a86a26cce2b974c4b4aa9f6ddb60b68",
+        "checkpoint_manifest.json": "5da4785b09c4ac6ee201489740db988c738bb8336605c7a99e03e7687eb55d6d",
+        "run_manifest.json": "aa1b4cd2d1ce0660d5af8f331ca9607003b74e89e7dd04b6d32b0cf0d90b3f40",
+        "summary.json": "4e4d6451fd379082b66e527dc5aaf9ce4425206e2652203c1d781cec3b1a4bfb"
+      },
+      "2": {
+        "SUCCESS.json": "807d323982ef08bf63fa8fb59358f93e084880bd6add4baa5cbdda12b17340e4",
+        "checkpoint_manifest.json": "30fbbcc8cd325f5fb057873af5c65595085a048200899a51bab7a2c985029c9f",
+        "run_manifest.json": "fde823faa132e90d3ef2f5170134c1921ead132648680985019805be21ebf946",
+        "summary.json": "98b64e0a87893ef5a0261ce7f5ce75961b7326365d2da7c3e6d159c1df18bca7"
+      }
+    },
+    "run_id": "vr8-rich48-20261101-234215"
+  }
+}
