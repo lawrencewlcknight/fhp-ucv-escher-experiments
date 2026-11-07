@@ -1,6 +1,6 @@
-# Experiments 42 and 43: the value of the rich representation
+# Shared evaluator: rich versus original representation
 
-Two evaluation-only studies reuse the fixed 48-hour FHP policies. There is no new training.
+The algorithm-owned Experiment 9 studies in the SD-CFR and VR-Deep repositories reuse the fixed 48-hour FHP policies. There is no new training.
 
 | Experiment | Algorithm | Rich policy cohort (Exp8) | Original cohort (Exp6) |
 |---|---|---|---|
@@ -34,60 +34,15 @@ Conditional deal Monte Carlo uncertainty is reported separately, using duplicate
 
 Incomplete, duplicated or corrupted production shards cannot produce a final aggregate. Resume requires identical policies, implementation, dependency versions, protocol and streams; worker count may change. Completed shards are reused. A successful smoke is explicitly marked as having no strength evidence.
 
-## Cloud execution
+## Experiment ownership and launching
 
-Run from the UCV evaluation repository. Each experiment is independently launchable and uses one `n2-standard-16` VM with a 200 GB disk, 16 single-thread evaluation workers, periodic uploads, and a 24-hour Batch ceiling. The ceiling is a safety limit, not a duration forecast. If needed, resume with the same output namespace and pinned commit. The evaluator emits a timing forecast after profiling.
+The experiment definitions, launchers and launch documentation have moved:
 
-After committing and pushing the implementation, set:
+| Owner repository | Native experiment | Definition | Legacy evaluation ID |
+|---|---|---|---|
+| `fhp-deep-cfr-experiments` | SD-CFR Experiment 9 | `experiments/fhp/exp9_sd_cfr_representation_48h/README.md` | 42 |
+| `fhp-vr-deep-experiments` | VR-Deep Experiment 9 | `experiments/fhp/exp9_vr_deep_representation_48h/README.md` | 43 |
 
-```bash
-export PROJECT_ID=clever-overview-399515
-export REGION=europe-west1
-export BUCKET=gs://clever-overview-399515-fhp-escher-results
-export SA_EMAIL='<existing Batch runner service account>'
-export REPO_REF='<full pushed commit containing Experiments 42 and 43>'
-```
+Launch from the respective algorithm repository. Its `REPO_REF` pins the owner definition; its configuration separately pins this shared evaluator to UCV commit `b6eabbeeeca6d8ae8f07f383a5296492c2cd2376`. Existing evaluation identifiers, scoring streams and resume contracts are retained. Previously launched jobs and results remain valid.
 
-For SD-CFR:
-
-```bash
-export RUN_ID="exp42-sd-repr-$(date -u '+%Y%m%d-%H%M%S')"
-bash gcp/run_exp42_sd_representation_48h.sh dry-run
-bash gcp/run_exp42_sd_representation_48h.sh run
-```
-
-For VR-Deep:
-
-```bash
-export RUN_ID="exp43-vr-repr-$(date -u '+%Y%m%d-%H%M%S')"
-bash gcp/run_exp43_vr_representation_48h.sh dry-run
-bash gcp/run_exp43_vr_representation_48h.sh run
-```
-
-Supported actions: `dry-run`, `preflight`, `smoke-cloud`, `run`, `resume`, `status`. `run` already includes smoke before full scoring. A separate `smoke-cloud` invocation needs a distinct RUN_ID from production. Preflight checks explicit source-bucket read grants and output-bucket read/write grants for the VM runner, plus metadata existence; it does not change IAM. It cannot resolve inherited/custom/conditional IAM grants or organisational denies. Only the selected algorithm's source bucket is needed. `SD_BUCKET` and `VR_BUCKET` can override the documented source bucket roots.
-
-Launchers export the builder from `REPO_REF`, reject an existing output prefix for a fresh launch, and reject concurrently active jobs using the same namespace. A Batch `SUCCEEDED` state alone is insufficient: production completion requires `analysis/SUCCESS.json` with `smoke=false` and 900,000 duplicate pairs.
-
-## Download analysis only
-
-With `RUN_ID` set to the completed evaluation:
-
-```bash
-python3 gcp/download_representation_analysis.py \
-  --bucket "$BUCKET" --run-id "$RUN_ID" \
-  --output "cloud_outputs/$RUN_ID/analysis"
-```
-
-The helper requires a complete production receipt, downloads only the ten named analysis artifacts plus the receipt, and verifies their checksums. It does not download model objects, historical archives, training states or match shards. Outputs include `analysis_summary.md`, the 3×3 heatmap, matchup/summary CSVs, source index, timing forecast and training context. Cloud workers download only the final playable policies and metadata; full SD histories are necessary for faithful evaluation and remain on the VM.
-
-## Local execution
-
-Arrange downloaded sources under `INPUT/{original,rich}/{sd,vr}/workers/<native worker name>/`. Only the chosen algorithm is required. Each worker needs pinned metadata plus its final playable policy (all SD archive chunks or the VR 48h snapshot).
-
-```bash
-python3 -m experiments.fhp.exp42_fhp_sd_representation_48h.run \
-  --source-root INPUT --vr-repo /path/to/fhp-vr-deep-experiments \
-  --sd-repo /path/to/fhp-deep-cfr-experiments --output OUTPUT --workers 16
-```
-
-Use `experiments.fhp.exp43_fhp_vr_representation_48h.run` for VR. Source/output directories must be disjoint. Use native repository revisions pinned in `engine.py` and the same environment for resume. `--smoke-only` verifies policies and gameplay without producing a strength result.
+This directory and the generic `gcp/representation_*` helpers remain shared infrastructure. There are no active algorithm-specific launchers in this repository. Use the owner's `gcp/download_exp9_representation_analysis.sh` for analysis-only downloads into that repository.

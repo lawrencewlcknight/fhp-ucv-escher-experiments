@@ -196,7 +196,6 @@ def test_batch_and_launcher(tmp_path, algorithm, number):
         else:
             assert "time_48h.pt" in script and "storage rsync --recursive --exclude='^(?!time" not in script
     subprocess.run([sys.executable,"-S",str(ROOT/"gcp/representation_head_to_head_batch.py"),*cli],check=True)
-    subprocess.run(["bash","-n",str(ROOT/f"gcp/run_exp{number}_{algorithm}_representation_48h.sh")],check=True)
     options.run_id = sources.PINS[algorithm]["original"]["run_id"]
     with pytest.raises(ValueError): batch.build_job(options)
 

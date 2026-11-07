@@ -1,7 +1,9 @@
-# Experiment 43: VR-DeepPDCFR+, rich versus original
+# Moved: VR-DeepPDCFR+ representation comparison
 
-Evaluate the fixed 48-hour Experiment 8 policies against Experiment 6, using all nine cross-seed pairings and 100,000 duplicate deal pairs per pairing. No retraining.
+This study is now **Experiment 9 in `fhp-vr-deep-experiments`**.
 
-See the [shared protocol and launch instructions](../representation_head_to_head/README.md).
+- Definition and protocol: `experiments/fhp/exp9_vr_deep_representation_48h/README.md` in that repository.
+- Launcher: `gcp/run_exp9_vr_deep_representation_48h.sh` in that repository.
+- Set `REPO_REF` to a pushed commit of that repository containing Experiment 9.
 
-Launcher: `gcp/run_exp43_vr_representation_48h.sh`. Local entry point: `python3 -m experiments.fhp.exp43_fhp_vr_representation_48h.run`.
+The shared scoring dependency remains pinned to UCV commit `b6eabbeeeca6d8ae8f07f383a5296492c2cd2376`. Existing jobs, evaluation ID 43, RNG streams and stored results remain valid; no rerun is required because of this move. Historical launchers remain available at that old commit for reproducibility.
