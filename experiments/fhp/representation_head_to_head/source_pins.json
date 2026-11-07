@@ -1,0 +1,246 @@
+{
+  "sd": {
+    "original": {
+      "config_sha256": "4e7993aa32d755d9b3f69140c257b3ffc2ee03a48187aa43dd3be760172fc576",
+      "feature_encoder": {
+        "betting_encoding": "two_rounds_five_slots_fold_call_raise_one_hot",
+        "card_order": "channel_suit_rank",
+        "full_state_layout": {
+          "card_size": 156,
+          "name": "critic_full_state",
+          "total_size": 263
+        },
+        "id": "fhp_lossless_suit_canonical_v1",
+        "lossless_modulo_suit_symmetry": true,
+        "policy_layout": {
+          "card_size": 104,
+          "name": "player_information_state",
+          "total_size": 183
+        },
+        "version": 1
+      },
+      "metadata": {
+        "0": {
+          "SUCCESS.json": "68f8d21750ec01b6838b7269251983c61212f5bfc1855df89c7aa14e4eaf6688",
+          "checkpoint_manifest.json": "7a40b3015e56bc55cd589e1f4b17de3748188ff05c86ff43af5dd287b90d7b9a",
+          "run_manifest.json": "4e81d3841f30a876498a8197a70ab68d13a617da20bb128eb29913d00fe960d5"
+        },
+        "1": {
+          "SUCCESS.json": "b395c40e16102985494f5f6b349f041648095482dfd5a5bf900a929e09de8bdb",
+          "checkpoint_manifest.json": "576cf4ce2847aeb888c624574abcaa4487018dad43c8f08957c12b1a225dbd1a",
+          "run_manifest.json": "84e9bc8996e648387d6de0323700e8d695f8e692f48c6e1dc0642b5798e931e3"
+        },
+        "2": {
+          "SUCCESS.json": "68adf7b68c95e54b5815dcbc10afd006388e102e4cf606b8cd4d38fd2953c25b",
+          "checkpoint_manifest.json": "f9e91ac13ed34fd0fa46c8ed89788d947a43319e172d749027796dbc5e6e3e2e",
+          "run_manifest.json": "53dea28bd684343459cf7a0c6e28b25692d6d626e52e62eb4111aa7b9e137dad"
+        }
+      },
+      "run_id": "sdcfr6-48h-20261002-161544",
+      "source_commit": "bb689252d6b322adb3de6102d095a49c3ed87250",
+      "source_names": [
+        "exp6_sd_cfr_parallel_48h",
+        "parallel_structured_uniform_sd_cfr_48h"
+      ]
+    },
+    "rich": {
+      "config_sha256": "9b06407a3a010ca7b6450783843dd293f6092c087f17d1d0df2d861b9a2e73bd",
+      "feature_encoder": {
+        "additive_features": [
+          "available",
+          "win_probability",
+          "tie_probability",
+          "loss_probability",
+          "equity",
+          "unbeatable",
+          "pot_bb",
+          "call_cost_bb",
+          "pot_odds",
+          "raises_remaining_fraction",
+          "acts_last",
+          "next_to_act",
+          "call_closes_final_round",
+          "equity_minus_pot_odds",
+          "equity_times_pot_odds",
+          "equity_times_closes",
+          "equity_times_raises",
+          "equity_times_position"
+        ],
+        "base_encoder_id": "fhp_lossless_hand_board_v2",
+        "base_full_state_prefix_size": 323,
+        "base_policy_prefix_size": 213,
+        "betting_encoding": "two_rounds_five_slots_fold_call_raise_one_hot",
+        "blocker_reference": "1176 board-compatible holdings before own-card removal; 1081 afterwards",
+        "board_table_cache_entries_per_process": 64,
+        "card_order": "channel_suit_rank",
+        "classes": [],
+        "feature_package": "AE",
+        "full_state_extra_order": "player0_then_player1; own-plus-public-only per perspective",
+        "full_state_layout": {
+          "card_size": 156,
+          "name": "strategic_AE_critic_v1",
+          "total_size": 359
+        },
+        "grouping": "unchanged exact canonical information sets; no lossy buckets",
+        "id": "fhp_hand_board_strategic_ae_v1",
+        "lossless_modulo_suit_symmetry": true,
+        "opponent_prior": "uniform legal holdings, NOT action-conditioned or actual hidden cards",
+        "policy_layout": {
+          "card_size": 104,
+          "name": "strategic_AE_player_v1",
+          "total_size": 231
+        },
+        "unavailable_features": "zero; availability indicator distinguishes missing from zero strength",
+        "version": 1
+      },
+      "metadata": {
+        "0": {
+          "SUCCESS.json": "3d0ca2152d9f9381c0f18fecfb6f435c965f07d46ea562ac247d1c169395b24b",
+          "checkpoint_manifest.json": "0eded9994c19b741e379671c61bf16c340174fa680e0d55f44d7dcdc1c453bb7",
+          "run_manifest.json": "f039f7225fed495c7c691be3838f7cb13d2bf18ad3fb8153f3e7a837ce41442c"
+        },
+        "1": {
+          "SUCCESS.json": "2ed51ce0d0169945b34beff8c594a62ae1a738109f6b71fd0824ad35b28369f1",
+          "checkpoint_manifest.json": "1641936eb1d9bb921f04e57f5fb2a1b6e453d624884db53acafad280009fa215",
+          "run_manifest.json": "b1131c944dd80f34fc570fe48e83fbacd25cf3321b81c05075e903cbe2c6de28"
+        },
+        "2": {
+          "SUCCESS.json": "1ac0620e00be7ec4253752c9546b2183010cdc4657d0e8a5111864d54e800a72",
+          "checkpoint_manifest.json": "29efdbe975512abf6ef974f7002ab161a2bfd990c8ff2497ead2cce884067e75",
+          "run_manifest.json": "d231ed35298e36d4843869feab4b489374ec6f3d6e4b211d7446478bd331fbf2"
+        }
+      },
+      "run_id": "sd8-rich48-20261101-234234",
+      "source_commit": "ac56342ae92824e06b206dd909a99c897529e373",
+      "source_names": [
+        "exp8_sd_cfr_rich_ae_48h",
+        "rich_ae_uniform_sd_cfr_48h"
+      ]
+    }
+  },
+  "vr": {
+    "original": {
+      "config_sha256": "dfbbfc38f8cede42aa27844994af2c40f639f46ef42f29f23efd8ba629a0746f",
+      "feature_encoder": {
+        "betting_encoding": "two_rounds_five_slots_fold_call_raise_one_hot",
+        "card_order": "channel_suit_rank",
+        "full_state_layout": {
+          "card_size": 156,
+          "name": "critic_full_state",
+          "total_size": 263
+        },
+        "id": "fhp_lossless_suit_canonical_v1",
+        "lossless_modulo_suit_symmetry": true,
+        "policy_layout": {
+          "card_size": 104,
+          "name": "player_information_state",
+          "total_size": 183
+        },
+        "version": 1
+      },
+      "metadata": {
+        "0": {
+          "SUCCESS.json": "3f8ca3e3de4c362d9c42ca1cb5d07fcffb30e3d50854363b07d70d396e11fbf4",
+          "checkpoint_manifest.json": "5923188675a2d22e698c24618b5129bd3e6d7da21bba16bc2227f0eabcbfd685",
+          "run_manifest.json": "3c1c0ca815ba985c78d6477e47c1fffa2d44f31a42eff8456a3c76018fe73b12",
+          "summary.json": "bcaeb0697f95143749108af074a976aa0e02f612d5dc3e59e1dabf9e17e1bcd4"
+        },
+        "1": {
+          "SUCCESS.json": "46e9b3939ae6e01640bf5b8b3304ada5e9825e2de5a47b3ecea0d12e7d7b7614",
+          "checkpoint_manifest.json": "50c1e5aa6c465c92281dc1c2880b14f12608351cec60cb53f36b7add1ed8fe69",
+          "run_manifest.json": "d4ac6da5f6f8be7b298a6102ca431cb756e76515ea2f2060c0cc930f1ee329ca",
+          "summary.json": "4ed39f195f0c16d0cb541091e518877fc4a1cf839887a425548458214f8ef075"
+        },
+        "2": {
+          "SUCCESS.json": "546ff77f7ff15c8be4e2f557bc99ce88b99cee6ff3c6edef1ffab0b52c5e74bb",
+          "checkpoint_manifest.json": "e4093c0f3f5c3f06117c1f7a2f654b4cafc74145736a5b33cae4ecf831cc2a10",
+          "run_manifest.json": "fac114fb8935f069f7259ca7f74bc6ee46a427629ec41dce722cec0551e6eb5b",
+          "summary.json": "48dd10973b9feae5c50ba5d2082c04ef56523fff6b42115866a5607d66d4a13e"
+        }
+      },
+      "run_id": "vr6-ray48-20261003-221425",
+      "source_commit": "6b95a3ecd191f02bd6972c72a3bf8514483ae02b",
+      "source_names": [
+        "exp6_fhp_vr_deep_ray8_48h",
+        "lossless_vr_deep_pdcfr_plus_ray8_48h"
+      ]
+    },
+    "rich": {
+      "config_sha256": "1938752e0c82490f030fcef7996183148544b7c07107f47287587b718bbc65aa",
+      "feature_encoder": {
+        "additive_features": [
+          "available",
+          "win_probability",
+          "tie_probability",
+          "loss_probability",
+          "equity",
+          "unbeatable",
+          "pot_bb",
+          "call_cost_bb",
+          "pot_odds",
+          "raises_remaining_fraction",
+          "acts_last",
+          "next_to_act",
+          "call_closes_final_round",
+          "equity_minus_pot_odds",
+          "equity_times_pot_odds",
+          "equity_times_closes",
+          "equity_times_raises",
+          "equity_times_position"
+        ],
+        "base_encoder_id": "fhp_lossless_hand_board_v2",
+        "base_full_state_prefix_size": 323,
+        "base_policy_prefix_size": 213,
+        "betting_encoding": "two_rounds_five_slots_fold_call_raise_one_hot",
+        "blocker_reference": "1176 board-compatible holdings before own-card removal; 1081 afterwards",
+        "board_table_cache_entries_per_process": 64,
+        "card_order": "channel_suit_rank",
+        "classes": [],
+        "feature_package": "AE",
+        "full_state_extra_order": "player0_then_player1; own-plus-public-only per perspective",
+        "full_state_layout": {
+          "card_size": 156,
+          "name": "strategic_AE_critic_v1",
+          "total_size": 359
+        },
+        "grouping": "unchanged exact canonical information sets; no lossy buckets",
+        "id": "fhp_hand_board_strategic_ae_v1",
+        "lossless_modulo_suit_symmetry": true,
+        "opponent_prior": "uniform legal holdings, NOT action-conditioned or actual hidden cards",
+        "policy_layout": {
+          "card_size": 104,
+          "name": "strategic_AE_player_v1",
+          "total_size": 231
+        },
+        "unavailable_features": "zero; availability indicator distinguishes missing from zero strength",
+        "version": 1
+      },
+      "metadata": {
+        "0": {
+          "SUCCESS.json": "4b31c41ad26def8d4948c403eb2d65b587cc38d8cc1812fae103e97de801c93b",
+          "checkpoint_manifest.json": "a6c19757b369cf902714304ddae54fff9c591257ba3dd715bdd3a8dbff602e15",
+          "run_manifest.json": "0c0491d5d3e50a4f3548542245a0a8422bf659a4159c7cc086f30a368cbdbe7a",
+          "summary.json": "15f49d3da553394386b91982bfa547da7a52f8b33242e40f12412c99ead11e11"
+        },
+        "1": {
+          "SUCCESS.json": "25bdf30118b719b64a10a0cde93b2a2b1a86a26cce2b974c4b4aa9f6ddb60b68",
+          "checkpoint_manifest.json": "5da4785b09c4ac6ee201489740db988c738bb8336605c7a99e03e7687eb55d6d",
+          "run_manifest.json": "aa1b4cd2d1ce0660d5af8f331ca9607003b74e89e7dd04b6d32b0cf0d90b3f40",
+          "summary.json": "4e4d6451fd379082b66e527dc5aaf9ce4425206e2652203c1d781cec3b1a4bfb"
+        },
+        "2": {
+          "SUCCESS.json": "807d323982ef08bf63fa8fb59358f93e084880bd6add4baa5cbdda12b17340e4",
+          "checkpoint_manifest.json": "30fbbcc8cd325f5fb057873af5c65595085a048200899a51bab7a2c985029c9f",
+          "run_manifest.json": "fde823faa132e90d3ef2f5170134c1921ead132648680985019805be21ebf946",
+          "summary.json": "98b64e0a87893ef5a0261ce7f5ce75961b7326365d2da7c3e6d159c1df18bca7"
+        }
+      },
+      "run_id": "vr8-rich48-20261101-234215",
+      "source_commit": "70abec44561c5e141edf870512ec4237cf9fe4ad",
+      "source_names": [
+        "exp8_fhp_vr_deep_rich_ae_48h",
+        "rich_ae_vr_deep_pdcfr_plus_48h"
+      ]
+    }
+  }
+}
